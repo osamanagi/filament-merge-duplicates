@@ -15,13 +15,21 @@ use Nagi\FilamentMergeDuplicates\Data\KeyHasher;
 use Nagi\FilamentMergeDuplicates\Data\ScopeHasher;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionValidator;
+use Nagi\FilamentMergeDuplicates\Merging\AuditReader;
+use Nagi\FilamentMergeDuplicates\Merging\AuditWriter;
 use Nagi\FilamentMergeDuplicates\Merging\FieldDiffBuilder;
 use Nagi\FilamentMergeDuplicates\Merging\Fingerprinter;
+use Nagi\FilamentMergeDuplicates\Merging\LockManager;
+use Nagi\FilamentMergeDuplicates\Merging\MergeExecutor;
 use Nagi\FilamentMergeDuplicates\Merging\MergePlanner;
 use Nagi\FilamentMergeDuplicates\Merging\PreviewStore;
 use Nagi\FilamentMergeDuplicates\Merging\RelationPlanBuilder;
+use Nagi\FilamentMergeDuplicates\Merging\RetryPolicy;
 use Nagi\FilamentMergeDuplicates\Merging\SurvivorRecommender;
+use Nagi\FilamentMergeDuplicates\Relations\HasManyTransfer;
+use Nagi\FilamentMergeDuplicates\Relations\LockingWriterGuard;
 use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
+use Nagi\FilamentMergeDuplicates\Retirement\SurvivorResolver;
 use Nagi\FilamentMergeDuplicates\Scanning\DismissalService;
 use Nagi\FilamentMergeDuplicates\Scanning\KeyBuilder;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanChunkProcessor;
@@ -124,6 +132,28 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         );
 
         $this->app->singleton(MergePlanner::class);
+
+        $this->app->singleton(LockManager::class);
+        $this->app->singleton(AuditWriter::class);
+        $this->app->singleton(AuditReader::class);
+        $this->app->singleton(HasManyTransfer::class, fn (): HasManyTransfer => new HasManyTransfer(
+            (int) config('merge-duplicates.relations.max_children_per_merge', 500),
+        ));
+        $this->app->singleton(RetryPolicy::class, fn (): RetryPolicy => new RetryPolicy(3));
+        $this->app->singleton(MergeExecutor::class, fn ($app): MergeExecutor => new MergeExecutor(
+            $app->make(PreviewStore::class),
+            $app->make(MergePlanner::class),
+            $app->make(DefinitionValidator::class),
+            $app->make(HasManyTransfer::class),
+            $app->make(LockManager::class),
+            $app->make(AuditWriter::class),
+            $app->make(RetirementResolver::class),
+            $app->make(RetryPolicy::class),
+            array_values(array_filter((array) config('merge-duplicates.supported_merge_drivers', ['mysql', 'pgsql']), 'is_string')),
+            (string) config('merge-duplicates.key_version', 'v1'),
+        ));
+        $this->app->singleton(LockingWriterGuard::class);
+        $this->app->singleton(SurvivorResolver::class);
     }
 
     public function packageBooted(): void

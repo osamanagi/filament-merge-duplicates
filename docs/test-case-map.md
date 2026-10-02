@@ -49,14 +49,14 @@ Last updated: M0 (compatibility spike and design freeze).
 
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
-| R01 | partial | `tests/Feature/MergePlannerTest.php` | The plan counts the declared children a merge would move and describes the per-relation impact. The transfer itself is M4. |
+| R01 | passing | `tests/Execution/MergeExecutionTest.php` | A merge moves every declared child to the survivor exactly once, and the retired source keeps its unique values and its row. The transfer is proven on real MySQL and PostgreSQL. |
 | R02 | partial | `tests/Feature/MergePlannerTest.php` | A transfer that would collide with an existing child on a per-parent composite unique constraint is blocked before anything is written. The whole-merge rollback proof is M4. |
-| R03 | not started | — | |
+| R03 | partial | `tests/Execution/MergeGuardsTest.php` | Soft-deleted children move when the definition declares that ownership transfer is required, and stay with the retired source when it does not - the declared inventory is the inventory that moves. Child-level visibility scoping inside a relation is still only covered by the definition contract. |
 | R04 | not started | — | |
 | R05 | partial | `tests/Feature/MergePlannerTest.php`, `tests/Feature/DefinitionValidationTest.php` | Relation types v1 cannot transfer (has-one, belongs-to-many, morph-many, media library) are rejected as configuration blockers instead of being guessed, and an unsupported type declared inline is rejected the same way. Cross-connection relations are not covered yet. |
 | R06 | passing | `tests/Feature/MergePlannerTest.php` | A transfer above the configured cap is blocked with the configured limit, and the boundary value is allowed. |
-| R07 | not started | — | |
-| R08 | not started | — | |
+| R07 | passing | `tests/Execution/MergeRollbackTest.php` | A cancelled child save aborts the whole merge: fields, sibling children, retirement and the ledger entry all return to their original state, proven on both engines. |
+| R08 | passing | `tests/Execution/MergeExecutionTest.php` | Proven with two real connections: a child written by a cooperating writer after the review makes the preview stale, and a writer that tries to attach a child to a retired source is refused. Raw SQL that ignores the protocol remains the documented limitation. |
 
 ## Merge execution (M)
 
@@ -66,18 +66,18 @@ Last updated: M0 (compatibility spike and design freeze).
 | M02 | partial | `tests/Feature/MergePlannerTest.php` | Switching the survivor rebuilds the plan instead of reusing the previous one, and an expired preview is rejected. Definition-revision staleness is checked by `revalidate()` but its end-to-end case is M4. |
 | M03 | passing | `tests/Feature/MergePlannerTest.php` | A merge-relevant field changed without touching `updated_at` is caught by the fingerprint and the plan is refused, while an untouched pair produces a stable fingerprint. |
 | M04 | passing | `tests/Feature/MergePlannerTest.php` | A relationship change made after the preview is detected and the plan is refused instead of being silently recomputed. |
-| M05 | not started | — | |
-| M06 | partial | `tests/Feature/MergePlannerTest.php` | A preview replayed by a different actor, or in a different scope, is rejected. Replay of the same operation by the same actor is M4. |
-| M07 | not started | — | |
-| M08 | not started | — | |
-| M09 | not started | — | |
+| M05 | partial | `tests/Execution/MergeExecutionTest.php`, `tests/Execution/MergeRollbackTest.php` | A retired source cannot be merged again and a competing plan is blocked at planning time; locks are taken in one canonical typed-key order; a held lock produces bounded retries and then `RetryExhausted`, not a hang. Live parallel execution of two merges in flight is not yet exercised end to end - the M0 lock spike plus these terminal-state cases cover the mechanisms, and M7 repeats it as a concurrency run. |
+| M06 | passing | `tests/Execution/MergeExecutionTest.php` | A repeated operation token returns the recorded result with no second ledger row and no double transfer, which is the double-click and lost-response case. |
+| M07 | passing | `tests/Execution/MergeExecutionTest.php`, `tests/Execution/MergeRollbackTest.php` | A reused token from another actor, in another scope, or with different choices is refused; a preview with an unresolved blocking reason cannot be executed; an unreadable history entry fails explicitly. |
+| M08 | passing | `tests/Execution/MergeRollbackTest.php` | Failure is injected at all four mutation boundaries with real model events - survivor save, child save, source retirement, ledger write - and each one leaves fields, children, retirement state and ledger exactly as they were. |
+| M09 | passing | `tests/Execution/MergeExecutionTest.php`, `tests/Unit/Merging/RetryPolicyTest.php` | Retries are bounded at three and exhausted rather than waiting for a lock; classification is proven for both drivers' concurrency error shapes and for the errors that must never be retried; an after-commit listener failure is reported on the result while the merge stays committed. |
 
 ## Authorization (A)
 
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
-| A01 | not started | — | |
-| A02 | not started | — | |
+| A01 | partial | `tests/Execution/MergeExecutionTest.php`, `tests/Execution/MergeGuardsTest.php` | Reading merge history needs its own ability and the same scope; resolving a retired record needs the review ability and refuses records outside the acting scope; the executor fetches both records through the definition's visibility rules, so a hidden record cannot be merged by calling the service directly. UI-level leakage (counts, direct URLs) is M5. |
+| A02 | passing | `tests/Execution/MergeExecutionTest.php` | A permission revoked between the preview and the execution aborts before any write, and the executor reauthorizes again inside the transaction. |
 | A03 | passing | `tests/Feature/DefinitionValidationTest.php` | An unknown definition ID cannot be resolved, and an ability map grants nothing to an undeclared actor. |
 | A04 | passing | `tests/Feature/DefinitionValidationTest.php` | Deny-by-default authorizer denies every ability; a service actor gets only explicitly declared abilities; review never implies merge. |
 | A05 | not started | — | |
@@ -86,8 +86,8 @@ Last updated: M0 (compatibility spike and design freeze).
 
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
-| L01 | not started | — | |
-| L02 | not started | — | |
+| L01 | passing | `tests/Execution/MergeExecutionTest.php`, `tests/Execution/MergeGuardsTest.php` | A retired source stays terminal even after an external process restores the row, chains resolve to the active record, a loop is refused rather than followed, and no unmerge path exists. |
+| L02 | passing | `tests/Execution/MergeExecutionTest.php`, `tests/Execution/MergeRollbackTest.php` | Pruning previews never touches the ledger and the operation still replays; a payload written under a different application key fails explicitly instead of returning blank history; history stays readable when the actor row is gone. |
 
 ## UI (U) and performance (P)
 
@@ -101,7 +101,7 @@ Last updated: M0 (compatibility spike and design freeze).
 
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
-| C01 | not started | `tests/Concurrency/LockSpikeTest.php` | M0 evidence: merge execution refusal of SQLite is proven, and locking is proven on real MySQL 8 and PostgreSQL 15. The full engine/version matrix is M4/M7. |
+| C01 | partial | `tests/Execution/MergeRefusalTest.php`, `tests/Concurrency/LockSpikeTest.php` | Executing on SQLite is refused with a configuration error naming the engine and the supported ones, a definition whose model lives on another connection is refused as non-atomic, and the execution suite runs on real MySQL and PostgreSQL. The published engine/version matrix as a whole is M7. |
 | C02 | not started | `tests/Feature/PackageBootTest.php`, `tests/Feature/FilamentActionRenderTest.php` | M0 evidence: both majors install, boot, resolve the panel plugin and render/mount a real action, on all four dependency lanes. Authenticated review and merge journeys are M5. |
 | C03 | not started | `bin/lane-test.sh`, `bin/resolve-lane.sh` | M0 evidence: four lanes resolve and run, the published constraint `^4.0 \|\| ^5.0` resolves for both majors, and a separate required CI job proves installation on PHP 8.2, 8.3 and 8.4 for each major. Filament 5 behaviour is not executed on PHP 8.2 (dev tooling needs 8.3+) — see ADR 0008. |
 | C04 | not started | — | 4 → 5 upgrade with existing data is M6. |

@@ -47,9 +47,28 @@ the threshold must never be lowered to make a lane pass. CI runs the coverage jo
 in draft (non-blocking) mode until M7, and reports the measured percentage so
 regressions are visible.
 
-Measured totals so far: M2 69.6%, M3 76.1% (`src/` lines, pcov, full suite). The
-remainder is mostly the merge execution and UI paths that later milestones add,
-plus their error branches.
+Measured totals so far: M2 69.6%, M3 76.1%, M4 80.7% (`src/` lines, pcov, full
+suite). The remainder is mostly the merge execution and UI paths that later
+milestones add, plus their error branches.
+
+The largest remaining gaps after M4 are in `MergeExecutor` (defensive
+postcondition branches that need fault injection to reach), `HasManyTransfer`,
+`RelationPlanBuilder` (blocker branches) and `SurvivorRecommender` (M3 tie-break
+paths). M7 is where the 100% target has to be met, with the remaining branch gaps
+reviewed rather than assumed away.
+
+## Execution suite
+
+`tests/Execution/` proves what SQLite cannot: row locks, contention and
+transactional rollback. It runs on real MySQL and PostgreSQL through
+`EngineConnections`, sets the engine as both the default and the package
+connection, and skips (loudly, through `markTestSkipped`) when a service is
+unreachable instead of pretending another engine proved the property.
+
+The dataset is named `engines`, so every execution case runs twice. The engine
+schema is rebuilt once per engine per process, and rebuilt again if either the
+package or the fixture tables are missing, because `MigrationEngineTest` drops
+and rolls back the same database.
 
 Coverage is a code-execution metric, not behavioural proof. The acceptance cases
 in the case map, the real-database lanes and the UI assertions are what prove

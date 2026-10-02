@@ -52,6 +52,56 @@ final class MergePlan
         ));
     }
 
+    /**
+     * The declared child identifiers for one relation.
+     *
+     * A freshly built plan holds `RelationImpact` objects while a plan reloaded
+     * from the preview store holds decoded arrays, so both shapes are read here
+     * instead of by every caller. Identifiers are returned sorted, so two
+     * inventories can be compared directly.
+     *
+     * @return list<string>
+     */
+    public function childIdsFor(string $relation): array
+    {
+        foreach ($this->relations as $impact) {
+            if ($impact instanceof RelationImpact) {
+                if ($impact->relation !== $relation) {
+                    continue;
+                }
+
+                $ids = $impact->childIds;
+                sort($ids);
+
+                return $ids;
+            }
+
+            if (! is_array($impact) || ($impact['relation'] ?? null) !== $relation) {
+                continue;
+            }
+
+            $raw = $impact['child_ids'] ?? [];
+
+            if (! is_array($raw)) {
+                return [];
+            }
+
+            $ids = [];
+
+            foreach ($raw as $childId) {
+                if (is_string($childId)) {
+                    $ids[] = $childId;
+                }
+            }
+
+            sort($ids);
+
+            return $ids;
+        }
+
+        return [];
+    }
+
     public function hasBlockers(): bool
     {
         return $this->blockers !== [];

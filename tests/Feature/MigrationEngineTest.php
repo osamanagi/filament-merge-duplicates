@@ -108,6 +108,11 @@ it('installs, enforces the terminal constraint, and rolls back', function (strin
 
     $connection = probeConnection($engine);
 
+    // Start from an empty schema. The case is about a fresh install followed by
+    // a clean rollback, so tables left behind by another suite must not decide
+    // the outcome.
+    Schema::connection($connection)->dropAllTables();
+
     $migrate = [
         '--path' => packageMigrationPath(),
         '--realpath' => true,

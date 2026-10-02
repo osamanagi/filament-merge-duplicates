@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
+use Nagi\FilamentMergeDuplicates\Data\RecordId;
 use Nagi\FilamentMergeDuplicates\Exceptions\DomainConflict;
 use Nagi\FilamentMergeDuplicates\Exceptions\MergeTooLarge;
 use Nagi\FilamentMergeDuplicates\Exceptions\UnsupportedRelation;
@@ -73,7 +74,10 @@ final class RelationPlanBuilder
             }
 
             $children = $this->childrenOf($relation, $strategy->includesSoftDeletedChildren());
-            $ids = $children->map(static fn (Model $child): string => (string) $child->getKey())->all();
+            $ids = $children
+                ->map(static fn (Model $child): string => RecordId::fromModel($child)->encode())
+                ->values()
+                ->all();
 
             $childIds[$name] = $ids;
             $survivorCount = $this->childrenOf($survivor->{$name}(), $strategy->includesSoftDeletedChildren())->count();
