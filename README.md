@@ -7,7 +7,35 @@
 
 
 
-This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
+> [!WARNING]
+> **v1.0 is in development.** This repository is at milestone M0 (compatibility
+> spike and design freeze). The developer API, migrations and UI described in the
+> implementation plan are not implemented yet. Nothing here is installable for
+> production use until the M7 release gate passes.
+
+Detect, explain, review and deliberately merge duplicate records in Filament
+apps, without losing declared relationships. The package is generic: developers
+register an independent definition per Eloquent model exposed through a Filament
+resource, supplying matching rules, a field allowlist, scope, authorization and
+relationship strategies. No model, column or relationship is hardcoded.
+
+Proposed behaviour, once v1.0 lands:
+
+- Exact normalized single-field and composite matching, with an explanation for
+  every suggested match. No fuzzy or AI scoring, and no probabilistic match
+  claims.
+- Duplicate buckets surfaced as suggestions only. A suggestion never authorizes a
+  merge.
+- Review of exactly two records at a time, with a per-field conflict choice.
+- Explicit allowlisted scalar merging, declared `HasMany` transfers, and a
+  documented blocker for every unsupported relationship instead of a guessed
+  strategy.
+- Soft-delete retirement plus a terminal merge ledger, so a merged source can
+  never be merged again even if the row is restored outside the package.
+- Queued scans with progress and cancellation, tenant-aware visibility, encrypted
+  audit, and real MySQL/PostgreSQL concurrency guarantees.
+
+There is no undo, no automatic merge, no bulk merge and no hard delete in v1.
 
 ## Installation
 
@@ -18,7 +46,9 @@ composer require osamanagi/filament-merge-duplicates
 ```
 
 > [!IMPORTANT]
-> If you have not set up a custom theme and are using Filament Panels follow the instructions in the [Filament Docs](https://filamentphp.com/docs/4.x/styling/overview#creating-a-custom-theme) first.
+> The package is not published yet, so the command above fails until the v1.0 release. To work from a checkout, use the lane commands under Testing below.
+>
+> If you have not set up a custom theme and are using Filament Panels, follow the instructions for your installed major first: [Filament 4.x](https://filamentphp.com/docs/4.x/styling/overview#creating-a-custom-theme) or [Filament 5.x](https://filamentphp.com/docs/5.x/styling/overview#creating-a-custom-theme).
 
 After setting up a custom theme add the plugin's views to your theme css file or your app's css file if using the standalone packages.
 
@@ -52,18 +82,61 @@ return [
 ];
 ```
 
+## Requirements
+
+| Item | Supported |
+| --- | --- |
+| PHP | 8.2+ |
+| Laravel | 12.x |
+| Filament | 4.x **or** 5.x, from this single release line |
+| Livewire | constraining version comes from Filament: 3.x on Filament 4, 4.x on Filament 5 |
+| Merge execution database | MySQL 8 (InnoDB) or PostgreSQL 15+ |
+
+SQLite can run detection and UI tests, but merge execution refuses it because it
+cannot provide equivalent row-lock guarantees.
+
 ## Usage
 
+The developer API is not implemented yet and is defined by the implementation
+plan. The target shape is a definition class per model, plus a panel plugin:
+
 ```php
-$filamentMergeDuplicates = new Nagi\FilamentMergeDuplicates();
-echo $filamentMergeDuplicates->echoPhrase('Hello, Nagi!');
+MergeDuplicatesPlugin::make()->definitions(['example-records', 'other-records']);
 ```
+
+Definitions will supply matching rules, a field allowlist, a scope query,
+authorization, relation strategies and a retirement contract. See
+[docs/support-matrix.md](docs/support-matrix.md) for the exact v1 boundary and the
+blockers for unsupported models and relationships.
 
 ## Testing
 
 ```bash
-composer test
+composer test           # full suite on the current lane
+composer check          # Pint + PHPStan + Pest
+composer test:coverage  # pcov coverage of src/
 ```
+
+The package must pass on both Filament majors. The checked-in lockfile stays on
+one major, so the other lanes run in an isolated copy:
+
+```bash
+bin/lane-test.sh '^4.0'
+bin/lane-test.sh '^4.0' --prefer-lowest
+bin/lane-test.sh '^5.0'
+bin/lane-test.sh '^5.0' --prefer-lowest
+```
+
+Concurrency tests need real engines and are skipped when none is reachable:
+
+```bash
+docker compose up -d
+vendor/bin/pest tests/Concurrency
+```
+
+See [docs/testing.md](docs/testing.md) for the coverage gate and database
+services, and [docs/test-case-map.md](docs/test-case-map.md) for the acceptance
+case status.
 
 ## Changelog
 
