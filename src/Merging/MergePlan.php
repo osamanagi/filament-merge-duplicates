@@ -117,6 +117,95 @@ final class MergePlan
         return ! $this->hasBlockers();
     }
 
+    /**
+     * The blocker strings a per-field choice answers, derived from the
+     * differences rather than stored twice, so the planner's wording and this
+     * list cannot drift apart.
+     *
+     * @return list<string>
+     */
+    public function resolvableBlockers(): array
+    {
+        $blockers = [];
+
+        foreach ($this->differences as $difference) {
+            if ($difference->resolution->requiresChoice()) {
+                $blockers[] = self::choiceBlockerFor($difference);
+            }
+        }
+
+        return $blockers;
+    }
+
+    /**
+     * Blockers no choice can answer. A preview is executable only when every
+     * remaining blocker is a question the operator answers, not a reason the
+     * pair cannot be merged.
+     *
+     * @return list<string>
+     */
+    public function fatalBlockers(): array
+    {
+        return array_values(array_diff($this->blockers, $this->resolvableBlockers()));
+    }
+
+    /**
+     * The fields an explicit choice is required for, in preview order.
+     *
+     * @return list<string>
+     */
+    public function choiceFields(): array
+    {
+        $fields = [];
+
+        foreach ($this->differences as $difference) {
+            if ($difference->resolution->requiresChoice()) {
+                $fields[] = $difference->field;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @param  array<string, string>  $choices  field name => 'survivor' or 'source'
+     */
+    public function choicesComplete(array $choices): bool
+    {
+        foreach ($this->choiceFields() as $field) {
+            $choice = $choices[$field] ?? null;
+
+            if ($choice !== 'survivor' && $choice !== 'source') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Whether this preview can be confirmed with the given choices. Authorization
+     * is deliberately not part of this: it is rechecked at execution because it
+     * can change between preview and confirmation.
+     *
+     * @param  array<string, string>  $choices
+     */
+    public function canConfirm(array $choices): bool
+    {
+        return $this->fatalBlockers() === [] && $this->choicesComplete($choices);
+    }
+
+    /**
+     * The one wording the planner, the executor and the UI share for a field
+     * that needs a choice, so a change to it cannot make a preview look
+     * executable when the executor still considers it unresolved.
+     */
+    public static function choiceBlockerFor(FieldDifference $difference): string
+    {
+        return 'domain_conflict: the field [' . $difference->label
+            . '] has two different values, so an explicit choice is required.';
+    }
+
     public function withChoices(RecordId $survivorId, RecordId $sourceId, array $differences): self
     {
         return new self(

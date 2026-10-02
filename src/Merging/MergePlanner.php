@@ -99,7 +99,7 @@ final class MergePlanner
 
         foreach ($differences as $difference) {
             if ($difference->resolution->requiresChoice()) {
-                $blockers[] = 'domain_conflict: the field [' . $difference->label . '] has two different values, so an explicit choice is required.';
+                $blockers[] = MergePlan::choiceBlockerFor($difference);
             }
         }
 

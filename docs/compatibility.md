@@ -95,11 +95,74 @@ bin/resolve-lane.sh '^4.0'         # resolve as the local PHP
 bin/resolve-lane.sh '^5.0' 8.2.0   # resolve as if the host ran PHP 8.2
 ```
 
+## M5 verification — Filament page and Livewire surfaces
+
+M5 slice 4 added the first real panel page, so the page, route, navigation and
+Livewire surfaces are now verified instead of assumed. The page classes were read
+directly in both installed trees (Filament 5.9.0 locally, Filament 4.14.0 from the
+`v4.14.0` tag), and the identical suite was executed on both lanes.
+
+| Surface | Filament 4.14.0 | Filament 5.9.0 |
+| --- | --- | --- |
+| `Filament\Pages\Page` / `BasePage` | extends `Livewire\Component`, uses the actions and schemas traits | identical |
+| Page route registration | `HasRoutes::routes()` — `Route::get('/'.getSlug(), static::class)->name(getRelativeRouteName())` inside `Route::name('pages.')->group()` | identical |
+| Page route naming | `Page::getRouteName()` returns the panel-prefixed `pages.<relative>` name | identical |
+| Page URL generation | static `Page::getUrl(array $parameters, ...)` → `route(getRouteName(), $parameters)` | identical |
+| Navigation | `getNavigationItems()` / `getNavigationUrl()`; skipped when `shouldRegisterNavigation()` is false | identical |
+| Panel page registration | `Panel::pages(array)` (`Panel\Concerns\HasComponents`) | identical |
+| Plugin `register(Panel)` | invoked by `Panel::plugin()` | identical |
+| Livewire mount from a route parameter | `mount(string $definition)` receives the route segment | identical |
+| Livewire state updates | `->call('startScan')` re-renders with the new summary and state | identical |
+| Panel-aware Livewire page test | `livewire(Page::class, ['definition' => $id])`; `mount()` `abort(404)`/`abort(403)` surface as `assertNotFound()`/`assertForbidden()` | identical |
+
+Evidence: the full suite ran on both lanes in an isolated checkout —
+Filament 4.14.0 / Livewire 3.8.10 / Laravel 12.69.3 / Testbench 10.12.0 and
+Filament 5.9.0 / Livewire 4.4.7 / Laravel 12.69.3 / Testbench 10.12.0 —
+291 passed, 1 skipped, 927 assertions on each. The page tests are
+`tests/Feature/DuplicateReviewPageTest.php`.
+
+No compatibility adapter was needed for these surfaces. The page deliberately uses
+plain semantic markup and `wire:click` rather than Filament Blade components, for the
+same cross-major reason as the banner: the rendered output is then identical on both
+majors without a version check. Render hooks are **not** verified here and remain open
+for the M5 gate; Filament actions are, see below.
+
+M5 slice 5 added the pair comparison, merge confirmation and audit pages on the same
+page/route/parameter surfaces, plus Livewire state updates that rebuild a server-side
+plan (`setSurvivor`, `setChoice`), Filament notification assertions (`assertNotified`)
+and a redirect on dismissal (`assertRedirect`). Those additions were read on both
+majors and the suite passed on both lanes: 311 passed, 1 skipped, 982 assertions each
+(Filament 4.14.0/Livewire 3.8.10 and Filament 5.9.0/Livewire 4.4.7). The new page tests
+are `tests/Feature/DuplicateMergePageTest.php`.
+
+M5 slice 6 registers one package stylesheet through `FilamentAsset::register` and
+asserts the file the asset points at exists (`tests/Feature/AssetRegistrationTest.php`).
+The stylesheet does not import Filament's theme - the panel already ships it - and adds
+only focus, forced-colours and print robustness. The UUID-keyed, non-soft-deleting
+fixture is driven through the same pages in
+`tests/Feature/FilamentTwoModelJourneyTest.php`, which also checks that record markup
+is escaped. `tests/Execution/MergePageJourneyTest.php` then confirms a merge through
+the page and verifies that a pair changed after the preview is refused, on both MySQL
+and PostgreSQL. A Filament action with a confirmation modal is mounted and called on
+the review page (`mountAction`/`assertActionMounted`/`assertMountedActionModalSee`/
+`callMountedAction`), which exercises the action and modal surfaces on a real page on
+both majors. Both lanes ran 326 passed, 1 skipped, 1043 assertions each.
+
+M5 slice 7 (the page-started scan) was verified in a browser on both majors rather than in
+the lane suite alone: Filament 5.9.0 and Filament 4.11.6 demo applications, each with two
+unrelated definitions in one panel, walked through scan → review → compare → merge → audit,
+with the group list checked afterwards. `docs/demo-walkthrough.md` records the
+installations, the observed states and the three host-side defects the walkthrough
+surfaced. Dispatch of the chunk job from the page is pinned by
+`Queue::assertPushed(ProcessScanChunk::class)` in the page and starter tests, because a
+started scan that nothing drains is exactly what the browser review caught. Both lanes then
+ran 327 passed, 1 skipped, 1050 assertions each.
+
 ## Re-verification points
 
 | Milestone | Must re-verify |
 | --- | --- |
-| M5 | Page/action/hooks/asset APIs on both majors, Livewire state updates, modal actions |
+| M5 | Page/route/navigation, Livewire state, Filament action/modal and asset surfaces: verified on both majors (see above). Manual browser review completed on Filament 5.9.0 and Filament 4.11.6 demo installations (`docs/demo-walkthrough.md`). Render hooks are outstanding, deferred to the demo phase by agreement. |
 | M6 | A Filament 4 → 5 upgrade against existing package data, without a data reset |
 | M7 | Full matrix, resolved version range matching the published constraints |
 

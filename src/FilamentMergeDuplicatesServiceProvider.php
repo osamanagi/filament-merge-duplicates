@@ -2,10 +2,8 @@
 
 namespace Nagi\FilamentMergeDuplicates;
 
-use Filament\Support\Assets\AlpineComponent;
 use Filament\Support\Assets\Asset;
 use Filament\Support\Assets\Css;
-use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentIcon;
 use Illuminate\Filesystem\Filesystem;
@@ -15,6 +13,7 @@ use Nagi\FilamentMergeDuplicates\Data\KeyHasher;
 use Nagi\FilamentMergeDuplicates\Data\ScopeHasher;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionValidator;
+use Nagi\FilamentMergeDuplicates\Filament\Banner\DuplicateBannerFactory;
 use Nagi\FilamentMergeDuplicates\Merging\AuditReader;
 use Nagi\FilamentMergeDuplicates\Merging\AuditWriter;
 use Nagi\FilamentMergeDuplicates\Merging\FieldDiffBuilder;
@@ -22,6 +21,7 @@ use Nagi\FilamentMergeDuplicates\Merging\Fingerprinter;
 use Nagi\FilamentMergeDuplicates\Merging\LockManager;
 use Nagi\FilamentMergeDuplicates\Merging\MergeExecutor;
 use Nagi\FilamentMergeDuplicates\Merging\MergePlanner;
+use Nagi\FilamentMergeDuplicates\Merging\MergePreviewService;
 use Nagi\FilamentMergeDuplicates\Merging\PreviewStore;
 use Nagi\FilamentMergeDuplicates\Merging\RelationPlanBuilder;
 use Nagi\FilamentMergeDuplicates\Merging\RetryPolicy;
@@ -30,10 +30,14 @@ use Nagi\FilamentMergeDuplicates\Relations\HasManyTransfer;
 use Nagi\FilamentMergeDuplicates\Relations\LockingWriterGuard;
 use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
 use Nagi\FilamentMergeDuplicates\Retirement\SurvivorResolver;
+use Nagi\FilamentMergeDuplicates\Scanning\DirectPairMatcher;
 use Nagi\FilamentMergeDuplicates\Scanning\DismissalService;
 use Nagi\FilamentMergeDuplicates\Scanning\KeyBuilder;
+use Nagi\FilamentMergeDuplicates\Scanning\ReviewGroupQuery;
+use Nagi\FilamentMergeDuplicates\Scanning\ReviewSummaryQuery;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanChunkProcessor;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanCoordinator;
+use Nagi\FilamentMergeDuplicates\Scanning\ScanStarter;
 use Nagi\FilamentMergeDuplicates\Scanning\ScopeManager;
 use Nagi\FilamentMergeDuplicates\Scanning\SuggestionQuery;
 use Nagi\FilamentMergeDuplicates\Testing\TestsFilamentMergeDuplicates;
@@ -64,10 +68,12 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
                     ->askToStarRepoOnGitHub('osamanagi/filament-merge-duplicates');
             });
 
-        $configFileName = $package->shortName();
-
-        if (file_exists($package->basePath("/../config/{$configFileName}.php"))) {
-            $package->hasConfigFile();
+        // The config file and the config keys are named `merge-duplicates`,
+        // not after the package name (`filament-merge-duplicates`), so the name
+        // is stated explicitly. Deriving it from the package name silently
+        // skipped this file, so `config('merge-duplicates.*')` never loaded.
+        if (file_exists($package->basePath('/../config/merge-duplicates.php'))) {
+            $package->hasConfigFile('merge-duplicates');
         }
 
         if (file_exists($package->basePath('/../database/migrations'))) {
@@ -110,7 +116,12 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
 
         $this->app->singleton(ScanCoordinator::class);
         $this->app->singleton(DismissalService::class);
+        $this->app->singleton(DirectPairMatcher::class);
         $this->app->singleton(SuggestionQuery::class);
+        $this->app->singleton(ReviewSummaryQuery::class);
+        $this->app->singleton(ScanStarter::class);
+        $this->app->singleton(ReviewGroupQuery::class);
+        $this->app->singleton(DuplicateBannerFactory::class);
 
         $this->app->singleton(DefinitionValidator::class);
         $this->app->singleton(FieldDiffBuilder::class);
@@ -132,6 +143,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         );
 
         $this->app->singleton(MergePlanner::class);
+        $this->app->singleton(MergePreviewService::class);
 
         $this->app->singleton(LockManager::class);
         $this->app->singleton(AuditWriter::class);
@@ -198,14 +210,16 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
     }
 
     /**
+     * The package ships one stylesheet. It does not import Filament's theme,
+     * because the panel already provides it; it adds only the focus,
+     * forced-colours and print robustness the pages rely on.
+     *
      * @return array<Asset>
      */
     protected function getAssets(): array
     {
         return [
-            // AlpineComponent::make('filament-merge-duplicates', __DIR__ . '/../resources/dist/components/filament-merge-duplicates.js'),
-            // Css::make('filament-merge-duplicates-styles', __DIR__ . '/../resources/dist/filament-merge-duplicates.css'),
-            // Js::make('filament-merge-duplicates-scripts', __DIR__ . '/../resources/dist/filament-merge-duplicates.js'),
+            Css::make('filament-merge-duplicates', __DIR__ . '/../resources/dist/filament-merge-duplicates.css'),
         ];
     }
 
