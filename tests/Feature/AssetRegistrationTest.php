@@ -13,7 +13,7 @@ use Filament\Support\Facades\FilamentAsset;
 it('registers the package stylesheet with Filament', function () {
     $styles = FilamentAsset::getStyles(['osamanagi/filament-merge-duplicates']);
 
-    $ids = array_map(static fn (Css $style): string => $style->getId(), $styles);
+    $ids = array_map(static fn(Css $style): string => $style->getId(), $styles);
 
     expect($ids)->toContain('filament-merge-duplicates');
 });

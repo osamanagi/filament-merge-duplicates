@@ -38,7 +38,7 @@ function scanDefinition(array $abilities = ['scan']): ConfigurableDefinition
         'model' => Contact::class,
         'scopeKeys' => ['tenant_id'],
         'authorizer' => new AbilityMapAuthorizer(
-            array_map(static fn (string $ability): Ability => Ability::from($ability), $abilities),
+            array_map(static fn(string $ability): Ability => Ability::from($ability), $abilities),
             'actor-1',
         ),
     ]);
@@ -71,7 +71,7 @@ it('starts a queued scan for an actor who may scan', function () {
     // A scan that nothing drains would leave the page claiming to scan forever.
     Queue::assertPushed(
         ProcessScanChunk::class,
-        fn (ProcessScanChunk $job): bool => $job->definitionId === $definition->id() && $job->scanId === $scan->id,
+        fn(ProcessScanChunk $job): bool => $job->definitionId === $definition->id() && $job->scanId === $scan->id,
     );
 });
 
@@ -81,7 +81,7 @@ it('refuses to start a scan for an actor without the scan ability', function () 
 
     expect(app(ScanStarter::class)->canScan($definition, $context))->toBeFalse();
 
-    expect(fn () => app(ScanStarter::class)->start($definition, $context))
+    expect(fn() => app(ScanStarter::class)->start($definition, $context))
         ->toThrow(ForbiddenOperation::class);
 
     // The refused attempt queued neither a scan row nor any work.
@@ -98,7 +98,7 @@ it('reports a second scan for the same scope as a conflict rather than a denial'
 
     // The refusal comes from the data scope, not from permissions, so a page can
     // tell the actor to wait instead of telling them they are not allowed.
-    expect(fn () => app(ScanStarter::class)->start($definition, $context))
+    expect(fn() => app(ScanStarter::class)->start($definition, $context))
         ->toThrow(DomainConflict::class);
 
     expect(ScanRecord::on($context->connection)->count())->toBe(1);

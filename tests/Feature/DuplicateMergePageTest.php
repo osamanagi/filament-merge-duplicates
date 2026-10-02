@@ -65,7 +65,7 @@ function mergePreviewDefinition(string $id, array $abilities, array $overrides =
         'retirementStrategy' => new SoftDeleteRetirementStrategy,
         'writerGuard' => new RecordingWriterGuard,
         'authorizer' => new AbilityMapAuthorizer(
-            array_map(static fn (string $ability): Ability => Ability::from($ability), $abilities),
+            array_map(static fn(string $ability): Ability => Ability::from($ability), $abilities),
             'actor-1',
         ),
         ...$overrides,

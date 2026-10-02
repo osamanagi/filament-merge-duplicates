@@ -47,7 +47,7 @@ function uuidDefinition(string $id, array $abilities): ConfigurableDefinition
             MergeField::make('title')->label('Title'),
         ],
         'authorizer' => new AbilityMapAuthorizer(
-            array_map(static fn (string $ability): Ability => Ability::from($ability), $abilities),
+            array_map(static fn(string $ability): Ability => Ability::from($ability), $abilities),
             'actor-1',
         ),
     ]);

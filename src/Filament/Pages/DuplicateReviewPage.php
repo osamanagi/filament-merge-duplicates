@@ -201,12 +201,12 @@ final class DuplicateReviewPage extends Page
     public function confirmScanAction(): Action
     {
         return Action::make('confirmScan')
-            ->label(fn (): string => $this->scanLabel())
+            ->label(fn(): string => $this->scanLabel())
             ->requiresConfirmation()
             ->modalHeading((string) trans('filament-merge-duplicates::merge-duplicates.review.scan_confirm_heading'))
             ->modalDescription((string) trans('filament-merge-duplicates::merge-duplicates.review.scan_confirm_description'))
             ->modalSubmitActionLabel((string) trans('filament-merge-duplicates::merge-duplicates.actions.scan'))
-            ->action(fn () => $this->startScan());
+            ->action(fn() => $this->startScan());
     }
 
     private function scanLabel(): string
@@ -217,7 +217,7 @@ final class DuplicateReviewPage extends Page
 
         return (string) trans(
             'filament-merge-duplicates::merge-duplicates.actions.'
-            . ($state === ReviewState::Failed ? 'retry_scan' : 'scan'),
+                . ($state === ReviewState::Failed ? 'retry_scan' : 'scan'),
         );
     }
 
