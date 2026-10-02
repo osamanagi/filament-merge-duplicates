@@ -23,3 +23,13 @@ it('resolves the plugin from a real Filament panel', function () {
     expect(filament('filament-merge-duplicates'))
         ->toBeInstanceOf(FilamentMergeDuplicatesPlugin::class);
 });
+
+it('loads the package config file under its own key', function () {
+    // The file is `config/merge-duplicates.php` and the keys are
+    // `merge-duplicates.*`. Registering it under the package name would leave
+    // `config('merge-duplicates.*')` null in a real application.
+    expect(config('merge-duplicates'))->toBeArray()
+        ->and(config('merge-duplicates.scan.chunk_size'))->toBe(1000)
+        ->and(config('merge-duplicates.key_version'))->toBe('v1')
+        ->and(config('merge-duplicates.supported_merge_drivers'))->toBe(['mysql', 'pgsql']);
+});

@@ -68,10 +68,12 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
                     ->askToStarRepoOnGitHub('osamanagi/filament-merge-duplicates');
             });
 
-        $configFileName = $package->shortName();
-
-        if (file_exists($package->basePath("/../config/{$configFileName}.php"))) {
-            $package->hasConfigFile();
+        // The config file and the config keys are named `merge-duplicates`,
+        // not after the package name (`filament-merge-duplicates`), so the name
+        // is stated explicitly. Deriving it from the package name silently
+        // skipped this file, so `config('merge-duplicates.*')` never loaded.
+        if (file_exists($package->basePath('/../config/merge-duplicates.php'))) {
+            $package->hasConfigFile('merge-duplicates');
         }
 
         if (file_exists($package->basePath('/../database/migrations'))) {
