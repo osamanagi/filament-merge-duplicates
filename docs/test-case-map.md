@@ -12,14 +12,14 @@ Last updated: M0 (compatibility spike and design freeze).
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
 | D01 | not started | — | |
-| D02 | not started | — | |
-| D03 | not started | — | |
-| D04 | not started | — | |
-| D05 | not started | — | |
-| D06 | not started | — | |
+| D02 | passing | `tests/Unit/Normalization/NormalizerTest.php` | Null, empty, whitespace, invalid email and unsupported types all produce no key. |
+| D03 | passing | `tests/Unit/Normalization/NormalizerTest.php` | Case is an explicit option that changes the normalizer version; email domain is lowercased, local part only when opted in; originals are never mutated. |
+| D04 | passing | `tests/Unit/Data/TupleEncoderTest.php`, `tests/Unit/Matching/ExactRuleTest.php` | Composite partial matches produce no key; delimiter and type collisions are structurally impossible; field order is significant. |
+| D05 | passing | `tests/Unit/Data/RecordIdTest.php`, `tests/Unit/Normalization/NormalizerTest.php` | Bigint keys stay exact beyond PHP_INT_MAX; `0`, `'0'`, `false` and `null` remain distinct; ordering is symmetric and stable per key domain. |
+| D06 | passing | `tests/Unit/Normalization/NormalizerTest.php` | Arabic, emoji and combining marks round-trip verbatim; NFC is opt-in and versioned. |
 | D07 | not started | — | |
 | D08 | not started | — | |
-| D09 | not started | — | |
+| D09 | passing | `tests/Unit/Data/KeyHashingTest.php`, `tests/Feature/DefinitionValidationTest.php` | Duplicate definition and rule IDs raise early configuration errors; revision, key version and secret changes all invalidate digests. |
 | D10 | not started | — | |
 
 ## Scans (S)
@@ -78,8 +78,8 @@ Last updated: M0 (compatibility spike and design freeze).
 | --- | --- | --- | --- |
 | A01 | not started | — | |
 | A02 | not started | — | |
-| A03 | not started | — | |
-| A04 | not started | — | |
+| A03 | passing | `tests/Feature/DefinitionValidationTest.php` | An unknown definition ID cannot be resolved, and an ability map grants nothing to an undeclared actor. |
+| A04 | passing | `tests/Feature/DefinitionValidationTest.php` | Deny-by-default authorizer denies every ability; a service actor gets only explicitly declared abilities; review never implies merge. |
 | A05 | not started | — | |
 
 ## Ledger (L)
@@ -106,7 +106,7 @@ Last updated: M0 (compatibility spike and design freeze).
 | C03 | not started | `bin/lane-test.sh`, `bin/resolve-lane.sh` | M0 evidence: four lanes resolve and run, the published constraint `^4.0 \|\| ^5.0` resolves for both majors, and a separate required CI job proves installation on PHP 8.2, 8.3 and 8.4 for each major. Filament 5 behaviour is not executed on PHP 8.2 (dev tooling needs 8.3+) — see ADR 0008. |
 | C04 | not started | — | 4 → 5 upgrade with existing data is M6. |
 | C05 | not started | `tests/Feature/FilamentActionRenderTest.php` | M0 evidence: no adapter was needed for the surfaces verified so far, and both majors passed identical assertions. Adapter coverage for the full UI is M5. |
-| C06 | not started | — | Two unrelated definitions in one panel is M1/M5. |
+| C06 | not started | `tests/Feature/DefinitionValidationTest.php` | M1 evidence: two unrelated definitions with different rules, fields and labels coexist in one registry and are resolved by ID. Panel UI and per-panel permissions are M5. |
 | C07 | not started | — | Scalar-only and relation-bearing definitions is M1/M5. |
 
 ## Property tests

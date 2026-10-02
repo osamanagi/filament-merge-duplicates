@@ -11,6 +11,7 @@ use Filament\Support\Facades\FilamentIcon;
 use Illuminate\Filesystem\Filesystem;
 use Livewire\Features\SupportTesting\Testable;
 use Nagi\FilamentMergeDuplicates\Commands\FilamentMergeDuplicatesCommand;
+use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
 use Nagi\FilamentMergeDuplicates\Testing\TestsFilamentMergeDuplicates;
 use Spatie\LaravelPackageTools\Commands\InstallCommand;
 use Spatie\LaravelPackageTools\Package;
@@ -58,7 +59,10 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         }
     }
 
-    public function packageRegistered(): void {}
+    public function packageRegistered(): void
+    {
+        $this->app->singleton(DefinitionRegistry::class);
+    }
 
     public function packageBooted(): void
     {
@@ -87,6 +91,13 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
 
         // Testing
         Testable::mixin(new TestsFilamentMergeDuplicates);
+
+        // Definitions are registered by class name from configuration, so a
+        // queued worker can resolve one without loading panel middleware and no
+        // closure is ever serialised into a job.
+        $this->app->make(DefinitionRegistry::class)->registerMany(
+            (array) config('merge-duplicates.definitions', []),
+        );
     }
 
     protected function getAssetPackageName(): ?string
@@ -146,7 +157,12 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
     protected function getMigrations(): array
     {
         return [
-            'create_filament-merge-duplicates_table',
+            '2026_10_02_000001_create_filament_merge_duplicates_scopes_table',
+            '2026_10_02_000002_create_filament_merge_duplicates_scans_table',
+            '2026_10_02_000003_create_filament_merge_duplicates_memberships_table',
+            '2026_10_02_000004_create_filament_merge_duplicates_dismissals_table',
+            '2026_10_02_000005_create_filament_merge_duplicates_previews_table',
+            '2026_10_02_000006_create_filament_merge_duplicates_merges_table',
         ];
     }
 }

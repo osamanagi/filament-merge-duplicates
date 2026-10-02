@@ -2,21 +2,21 @@
 
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\EngineConnections;
 
 /**
- * M0 spike: prove the locking and writer-coordination primitives the merge
- * executor will rely on.
+ * M0 spike, kept as a standing check: prove the locking and writer-coordination
+ * primitives the merge executor relies on.
  *
  * The specification requires deterministic parent locks, serialization of
  * overlapping merges, and a WriterGuard protocol for concurrent non-plugin
  * writers. Those guarantees must not be assumed from framework documentation,
- * so this test proves them against real MySQL InnoDB and PostgreSQL, on
+ * so this test proves them against real MySQL InnoDB and PostgreSQL on
  * genuinely separate connections.
  *
  * The engine cases are skipped when no real engine is reachable, so the default
- * SQLite suite stays runnable. Run them with:
+ * SQLite suite stays runnable:
  *
- *     docker compose up -d
  *     vendor/bin/pest tests/Concurrency
  */
 dataset('engines', [
@@ -25,95 +25,16 @@ dataset('engines', [
 ]);
 
 /**
- * Registers independent connections to the same engine.
- *
- * `{engine}` acts as the merge executor, `{engine}_writer` acts as a concurrent
- * host writer, and `{engine}_probe` is used only to assert mutual exclusion.
+ * Fails closed (skips) when the engine is unreachable, then prepares a clean
+ * fixture schema on the engine under test.
  */
-function spikeConfigure(string $engine): void
+function spikeBoot(string $engine): void
 {
-    $presets = [
-        'mysql' => [
-            'driver' => 'mysql',
-            'host' => env('SPIKE_MYSQL_HOST', '127.0.0.1'),
-            'port' => env('SPIKE_MYSQL_PORT', '3306'),
-            'database' => env('SPIKE_MYSQL_DATABASE', 'merge_duplicates'),
-            'username' => env('SPIKE_MYSQL_USERNAME', 'merge'),
-            'password' => env('SPIKE_MYSQL_PASSWORD', 'secret'),
-            'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
-            'prefix' => '',
-            'strict' => true,
-            'engine' => 'InnoDB',
-        ],
-        'postgres' => [
-            'driver' => 'pgsql',
-            'host' => env('SPIKE_POSTGRES_HOST', '127.0.0.1'),
-            'port' => env('SPIKE_POSTGRES_PORT', '5432'),
-            'database' => env('SPIKE_POSTGRES_DATABASE', 'merge_duplicates'),
-            'username' => env('SPIKE_POSTGRES_USERNAME', 'merge'),
-            'password' => env('SPIKE_POSTGRES_PASSWORD', 'secret'),
-            'charset' => 'utf8',
-            'prefix' => '',
-            'search_path' => 'public',
-            'sslmode' => 'prefer',
-        ],
-    ];
-
-    $config = $presets[$engine];
-
-    // Never inherit a transaction from an earlier case: an open transaction
-    // keeps table metadata locks on MySQL and holds an aborted snapshot on
-    // PostgreSQL, which makes the next DROP TABLE wait forever.
-    spikeResetConnections($engine);
-
-    foreach ([$engine, "{$engine}_writer", "{$engine}_probe"] as $name) {
-        config()->set("database.connections.{$name}", $config);
+    if (! EngineConnections::reachable($engine)) {
+        test()->markTestSkipped("No {$engine} engine reachable for the concurrency spike.");
     }
 
-    // The probe connection must fail fast instead of hanging the suite.
-    if ($engine === 'mysql') {
-        DB::connection("{$engine}_probe")->statement('SET SESSION innodb_lock_wait_timeout = 1');
-
-        return;
-    }
-
-    DB::connection("{$engine}_probe")->statement('SET statement_timeout = 1000');
-    DB::connection("{$engine}_probe")->statement('SET lock_timeout = 1000');
-}
-
-/**
- * Rolls back anything still open and drops the connection, so no lock survives
- * the test that created it.
- */
-function spikeResetConnections(string $engine): void
-{
-    foreach ([$engine, "{$engine}_writer", "{$engine}_probe"] as $name) {
-        try {
-            $connection = DB::connection($name);
-
-            while ($connection->transactionLevel() > 0) {
-                $connection->rollBack();
-            }
-        } catch (Throwable) {
-            // The connection may never have been resolved; nothing to release.
-        }
-
-        DB::purge($name);
-    }
-}
-
-function spikeReachable(string $engine): bool
-{
-    spikeConfigure($engine);
-
-    try {
-        DB::connection($engine)->getPdo();
-
-        return true;
-    } catch (Throwable) {
-        return false;
-    }
+    spikeSchema($engine);
 }
 
 function spikeSchema(string $engine): void
@@ -135,23 +56,12 @@ function spikeSchema(string $engine): void
     });
 }
 
-/**
- * Fails closed (skips) when the engine is unreachable, then prepares a clean
- * fixture schema on the engine under test.
- */
-function spikeBoot(string $engine): void
-{
-    if (! spikeReachable($engine)) {
-        test()->markTestSkipped("No {$engine} engine reachable for the concurrency spike.");
-    }
-
-    spikeSchema($engine);
-}
 afterEach(function () {
-    foreach (['mysql', 'postgres'] as $engine) {
-        spikeResetConnections($engine);
+    foreach (EngineConnections::ENGINES as $engine) {
+        EngineConnections::reset($engine);
     }
 });
+
 it('makes a parent row lock mutually exclusive across separate connections', function (string $engine) {
     spikeBoot($engine);
 
@@ -170,8 +80,8 @@ it('makes a parent row lock mutually exclusive across separate connections', fun
     } catch (QueryException) {
         $blocked = true;
     } finally {
-        // A failed lock wait leaves the transaction open on both engines; it
-        // must be closed or the next case blocks on table metadata locks.
+        // A failed lock wait leaves the transaction open on both engines, which
+        // would block the next case on table metadata locks.
         while (DB::connection("{$engine}_probe")->transactionLevel() > 0) {
             DB::connection("{$engine}_probe")->rollBack();
         }
