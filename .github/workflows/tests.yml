@@ -2,6 +2,8 @@ name: tests
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 permissions:
@@ -119,7 +121,10 @@ jobs:
           '
 
       - name: Execute tests
-        run: vendor/bin/pest --ci
+        # Coverage is measured by the dedicated coverage job, which is the only
+        # job that provisions a coverage driver. Pest's --ci flag requests
+        # coverage, so the lanes must not use it.
+        run: vendor/bin/pest --no-coverage --colors=never
 
   coverage:
     name: Coverage draft (${{ matrix.lane }})
