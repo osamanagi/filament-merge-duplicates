@@ -48,7 +48,7 @@ final class MergePlan
     {
         return array_values(array_filter(
             $this->differences,
-            static fn(FieldDifference $difference): bool => $difference->resolution->requiresChoice(),
+            static fn (FieldDifference $difference): bool => $difference->resolution->requiresChoice(),
         ));
     }
 
@@ -252,13 +252,13 @@ final class MergePlan
             'blockers' => $this->blockers,
             'input_fingerprint' => $this->inputFingerprint,
             'expires_at' => $this->expiresAt->toIso8601String(),
-            'differences' => array_map(static fn(FieldDifference $difference): array => [
+            'differences' => array_map(static fn (FieldDifference $difference): array => [
                 'field' => $difference->field,
                 'label' => $difference->label,
                 'resolution' => $difference->resolution->value,
                 'audited' => $difference->audited,
             ], $this->differences),
-            'relations' => array_map(static fn(RelationImpact $impact): array => [
+            'relations' => array_map(static fn (RelationImpact $impact): array => [
                 'relation' => $impact->relation,
                 'label' => $impact->label,
                 'moving_count' => $impact->movingCount,
@@ -288,7 +288,7 @@ final class MergePlan
             survivorTitle: (string) $payload['survivor_title'],
             sourceTitle: (string) $payload['source_title'],
             survivorReason: (string) $payload['survivor_reason'],
-            differences: array_map(static fn(array $difference): FieldDifference => new FieldDifference(
+            differences: array_map(static fn (array $difference): FieldDifference => new FieldDifference(
                 field: (string) $difference['field'],
                 label: (string) $difference['label'],
                 resolution: FieldResolution::from((string) $difference['resolution']),
@@ -297,7 +297,7 @@ final class MergePlan
                 proposedValue: null,
                 audited: (bool) ($difference['audited'] ?? true),
             ), (array) $payload['differences']),
-            relations: array_map(static fn(array $impact): RelationImpact => new RelationImpact(
+            relations: array_map(static fn (array $impact): RelationImpact => new RelationImpact(
                 relation: (string) $impact['relation'],
                 label: (string) $impact['label'],
                 movingCount: (int) $impact['moving_count'],

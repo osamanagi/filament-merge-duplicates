@@ -93,11 +93,11 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
     {
         $this->app->singleton(DefinitionRegistry::class);
 
-        $this->app->singleton(KeyHasher::class, fn(): KeyHasher => KeyHasher::fromConfig(
+        $this->app->singleton(KeyHasher::class, fn (): KeyHasher => KeyHasher::fromConfig(
             is_string(config('merge-duplicates.secret')) ? config('merge-duplicates.secret') : null,
         ));
 
-        $this->app->singleton(ScopeHasher::class, fn(): ScopeHasher => ScopeHasher::fromConfig(
+        $this->app->singleton(ScopeHasher::class, fn (): ScopeHasher => ScopeHasher::fromConfig(
             is_string(config('merge-duplicates.secret')) ? config('merge-duplicates.secret') : null,
         ));
 
@@ -107,7 +107,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
 
         $this->app->singleton(
             ScanChunkProcessor::class,
-            fn(): ScanChunkProcessor => new ScanChunkProcessor(
+            fn (): ScanChunkProcessor => new ScanChunkProcessor(
                 $this->app->make(KeyBuilder::class),
                 $this->app->make(RetirementResolver::class),
                 (int) config('merge-duplicates.scan.chunk_size', 1000),
@@ -130,14 +130,14 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
 
         $this->app->singleton(
             RelationPlanBuilder::class,
-            fn(): RelationPlanBuilder => new RelationPlanBuilder(
+            fn (): RelationPlanBuilder => new RelationPlanBuilder(
                 (int) config('merge-duplicates.relations.max_children_per_merge', 500),
             ),
         );
 
         $this->app->singleton(
             PreviewStore::class,
-            fn(): PreviewStore => new PreviewStore(
+            fn (): PreviewStore => new PreviewStore(
                 (int) config('merge-duplicates.preview.ttl_minutes', 15),
             ),
         );
@@ -148,11 +148,11 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         $this->app->singleton(LockManager::class);
         $this->app->singleton(AuditWriter::class);
         $this->app->singleton(AuditReader::class);
-        $this->app->singleton(HasManyTransfer::class, fn(): HasManyTransfer => new HasManyTransfer(
+        $this->app->singleton(HasManyTransfer::class, fn (): HasManyTransfer => new HasManyTransfer(
             (int) config('merge-duplicates.relations.max_children_per_merge', 500),
         ));
-        $this->app->singleton(RetryPolicy::class, fn(): RetryPolicy => new RetryPolicy(3));
-        $this->app->singleton(MergeExecutor::class, fn($app): MergeExecutor => new MergeExecutor(
+        $this->app->singleton(RetryPolicy::class, fn (): RetryPolicy => new RetryPolicy(3));
+        $this->app->singleton(MergeExecutor::class, fn ($app): MergeExecutor => new MergeExecutor(
             $app->make(PreviewStore::class),
             $app->make(MergePlanner::class),
             $app->make(DefinitionValidator::class),

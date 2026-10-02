@@ -40,7 +40,7 @@ final class ReviewGroup
     {
         return array_values(array_filter(
             $this->members,
-            static fn(ReviewMember $member): bool => ! $member->missing && ! $member->retired,
+            static fn (ReviewMember $member): bool => ! $member->missing && ! $member->retired,
         ));
     }
 
