@@ -141,7 +141,9 @@ The stylesheet does not import Filament's theme - the panel already ships it - a
 only focus, forced-colours and print robustness. The UUID-keyed, non-soft-deleting
 fixture is driven through the same pages in
 `tests/Feature/FilamentTwoModelJourneyTest.php`, which also checks that record markup
-is escaped. Both lanes then ran 321 passed, 1 skipped, 1004 assertions each.
+is escaped. `tests/Execution/MergePageJourneyTest.php` then confirms a merge through
+the page and verifies that a pair changed after the preview is refused, on both MySQL
+and PostgreSQL. Both lanes ran 325 passed, 1 skipped, 1034 assertions each.
 
 ## Re-verification points
 

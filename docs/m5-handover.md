@@ -1,9 +1,8 @@
 # M5 handover — Filament experience (in progress)
 
-Status: **M5 is not finished and its gate is not met.** Seven slices are implemented
-and tested on both majors. What remains is manual browser review on both majors, modal
-actions/render hooks, and a real-engine page test for the merge success and
-stale-refresh paths.
+Status: **M5 is not finished and its gate is not met.** Seven slices are implemented,
+and the merge journey is now verified end to end on real MySQL and PostgreSQL. What
+remains is manual browser review on both majors and modal actions/render hooks.
 
 ## Branch state
 
@@ -27,7 +26,8 @@ stale-refresh paths.
 | Authorized scan seam | `e76631d` | `src/Scanning/ScanStarter.php`, `tests/Feature/ScanStarterTest.php` |
 | Review page + host trait + plugin wiring | `b4fed81` | `src/Filament/Pages/DuplicateReviewPage.php`, `src/Filament/Concerns/HasDuplicateSuggestions.php`, `resources/views/review-page.blade.php`, `src/FilamentMergeDuplicatesPlugin.php`, `resources/lang/{en,ar}/merge-duplicates.php`, `tests/Feature/DuplicateReviewPageTest.php`, fixture `tests/Fixtures/Livewire/DuplicateBannerProbe.php`, `docs/compatibility.md`, `docs/test-case-map.md` |
 | Merge preview, dismissal and audit | `f812b6f` | `src/Filament/Pages/DuplicateMergePage.php`, `DuplicateAuditPage.php`, `resources/views/{merge-page,audit-page}.blade.php`, `src/Merging/MergePreviewService.php`, `src/Scanning/DirectPairMatcher.php`, `src/Merging/MergePlan.php`, `src/FilamentMergeDuplicatesPlugin.php`, `tests/Feature/DuplicateMergePageTest.php`, `tests/Unit/Merging/MergePlanResolutionTest.php`, `tests/Unit/Scanning/DirectPairMatcherTest.php` |
-| Assets, two-model suite, escaping | this commit | `resources/css/index.css`, `resources/dist/filament-merge-duplicates.css`, `bin/build.js`, `src/FilamentMergeDuplicatesServiceProvider.php`, `tests/Feature/AssetRegistrationTest.php`, `tests/Feature/FilamentTwoModelJourneyTest.php` |
+| Assets, two-model suite, escaping | `965614d` | `resources/css/index.css`, `resources/dist/filament-merge-duplicates.css`, `bin/build.js`, `src/FilamentMergeDuplicatesServiceProvider.php`, `tests/Feature/AssetRegistrationTest.php`, `tests/Feature/FilamentTwoModelJourneyTest.php` |
+| Real-engine merge page journey | this commit | `tests/Execution/MergePageJourneyTest.php`, `docs/compatibility.md`, `docs/test-case-map.md` |
 
 Guarantees these already enforce (do not regress them):
 
@@ -126,7 +126,6 @@ proven in M4.
   only gate item that cannot be checked from the test suite.
 - **Modal actions and render hooks** are still unexercised; the pages use plain markup
   and `wire:click`.
-- A real-engine page test for the merge **success** and **stale-refresh** paths.
 - Decision (agreed): the host resource-table manual pair action is left to the
   consumer/demo. The domain guard (`DirectPairMatcher`) and
   `DuplicateMergePage::urlForPair()` are in place for it.
@@ -171,7 +170,7 @@ are what still keep the M5 gate unmet.
 ## Verification commands for this branch
 
 ```bash
-./vendor/bin/pest --no-coverage            # 321 passed, 1 skipped, 1004 assertions
+./vendor/bin/pest --no-coverage            # 325 passed, 1 skipped, 1034 assertions
 ./vendor/bin/phpstan analyse --memory-limit=1G
 ./vendor/bin/pint --test
 ./vendor/bin/pest --coverage --min=0       # coverage total (pcov; xdebug is absent)
