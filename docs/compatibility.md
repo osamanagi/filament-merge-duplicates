@@ -148,11 +148,21 @@ the review page (`mountAction`/`assertActionMounted`/`assertMountedActionModalSe
 `callMountedAction`), which exercises the action and modal surfaces on a real page on
 both majors. Both lanes ran 326 passed, 1 skipped, 1043 assertions each.
 
+M5 slice 7 (the page-started scan) was verified in a browser on both majors rather than in
+the lane suite alone: Filament 5.9.0 and Filament 4.11.6 demo applications, each with two
+unrelated definitions in one panel, walked through scan → review → compare → merge → audit,
+with the group list checked afterwards. `docs/demo-walkthrough.md` records the
+installations, the observed states and the three host-side defects the walkthrough
+surfaced. Dispatch of the chunk job from the page is pinned by
+`Queue::assertPushed(ProcessScanChunk::class)` in the page and starter tests, because a
+started scan that nothing drains is exactly what the browser review caught. Both lanes then
+ran 327 passed, 1 skipped, 1050 assertions each.
+
 ## Re-verification points
 
 | Milestone | Must re-verify |
 | --- | --- |
-| M5 | Page/route/navigation, Livewire state, Filament action/modal and asset surfaces: verified on both majors (see above). Render hooks and manual browser review are outstanding. |
+| M5 | Page/route/navigation, Livewire state, Filament action/modal and asset surfaces: verified on both majors (see above). Manual browser review completed on Filament 5.9.0 and Filament 4.11.6 demo installations (`docs/demo-walkthrough.md`). Render hooks are outstanding, deferred to the demo phase by agreement. |
 | M6 | A Filament 4 → 5 upgrade against existing package data, without a data reset |
 | M7 | Full matrix, resolved version range matching the published constraints |
 

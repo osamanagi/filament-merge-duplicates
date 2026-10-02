@@ -143,6 +143,13 @@ See [docs/testing.md](docs/testing.md) for the coverage gate and database
 services, and [docs/test-case-map.md](docs/test-case-map.md) for the acceptance
 case status.
 
+## Trying it in a real application
+
+[docs/demo-walkthrough.md](docs/demo-walkthrough.md) walks through the two demo
+installations used for the browser review (Filament 5.9 and Filament 4.11 on
+MySQL), the definitions they register, the host-side setup steps a fresh clone
+needs, and the states that were observed on each page.
+
 ## Changelog
 
 Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.

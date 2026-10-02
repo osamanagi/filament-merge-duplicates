@@ -124,12 +124,23 @@ proven in M4.
 
 ## Remaining for M5 (deferred to the demo phase)
 
-- **Manual browser review on both majors** (layout and keyboard behaviour).
 - **Render hooks** — no genuine use in the package yet, so deferred to the demo phase
   rather than added for the gate. Agreed with the maintainer.
 - Decision (agreed): the host resource-table manual pair action is left to the
   consumer/demo. The domain guard (`DirectPairMatcher`) and
   `DuplicateMergePage::urlForPair()` are in place for it.
+
+## Manual browser review (done)
+
+Performed in the two demo installations and recorded in `docs/demo-walkthrough.md`:
+Filament 5.9.0 under `/Users/nagi/code/demo` and Filament 4.11.6 under
+`/Users/nagi/code/demo-f4`, both on MySQL, both with two unrelated definitions in one
+panel. Scan, review, compare, merge and audit were walked through by hand on both, and the
+states were checked against the list afterwards (the merged group disappears).
+
+The walkthrough surfaced three real defects, all fixed on this branch: the config file was
+never loaded, a scan started from a page never dispatched its chunk job, and the banner
+`View` was escaped by Blade.
 
 ## M5 gate (from the plan) and what is still missing for it
 
@@ -140,9 +151,10 @@ proven in M4.
 > duplicate business logic in actions.
 
 Case-map rows: `A05`, `C02`, `C05`, `C06`, `C07`, `U01` and `U02` are partial, with
-slice-4/5 evidence recorded in `docs/test-case-map.md`. Modal actions, render hooks,
-asset rendering, the real-engine success/stale page paths and manual browser review
-are what still keep the M5 gate unmet.
+slice-4/5 evidence recorded in `docs/test-case-map.md`. Modal actions, asset rendering, the
+real-engine success/stale page paths and the manual browser review on both majors are now
+covered; **render hooks are the only remaining gate item**, deliberately deferred to the
+demo phase by agreement and therefore not claimable as done.
 
 ## Decisions already made (do not re-litigate without reason)
 
@@ -171,7 +183,7 @@ are what still keep the M5 gate unmet.
 ## Verification commands for this branch
 
 ```bash
-./vendor/bin/pest --no-coverage            # 326 passed, 1 skipped, 1043 assertions
+./vendor/bin/pest --no-coverage            # 327 passed, 1 skipped, 1050 assertions
 ./vendor/bin/phpstan analyse --memory-limit=1G
 ./vendor/bin/pint --test
 ./vendor/bin/pest --coverage --min=0       # coverage total (pcov; xdebug is absent)
