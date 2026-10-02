@@ -84,6 +84,13 @@ final class ConfigurableDefinition extends DuplicateDefinition
         return $resolver instanceof ContextResolver ? $resolver : new PanelContextResolver;
     }
 
+    public function recordTitleAttribute(): ?string
+    {
+        $attribute = $this->config['recordTitleAttribute'] ?? null;
+
+        return is_string($attribute) ? $attribute : null;
+    }
+
     public function scopedRecordQuery(): ScopedRecordQuery
     {
         return new TenantScopedRecordQuery;

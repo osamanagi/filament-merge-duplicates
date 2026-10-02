@@ -33,6 +33,7 @@ use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
 use Nagi\FilamentMergeDuplicates\Retirement\SurvivorResolver;
 use Nagi\FilamentMergeDuplicates\Scanning\DismissalService;
 use Nagi\FilamentMergeDuplicates\Scanning\KeyBuilder;
+use Nagi\FilamentMergeDuplicates\Scanning\ReviewGroupQuery;
 use Nagi\FilamentMergeDuplicates\Scanning\ReviewSummaryQuery;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanChunkProcessor;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanCoordinator;
@@ -114,6 +115,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         $this->app->singleton(DismissalService::class);
         $this->app->singleton(SuggestionQuery::class);
         $this->app->singleton(ReviewSummaryQuery::class);
+        $this->app->singleton(ReviewGroupQuery::class);
         $this->app->singleton(DuplicateBannerFactory::class);
 
         $this->app->singleton(DefinitionValidator::class);
