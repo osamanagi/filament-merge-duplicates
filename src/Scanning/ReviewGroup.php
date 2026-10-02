@@ -27,15 +27,21 @@ final class ReviewGroup
      */
     public function isReviewable(): bool
     {
-        $usable = 0;
+        return count($this->usableMembers()) >= 2;
+    }
 
-        foreach ($this->members as $member) {
-            if (! $member->missing && ! $member->retired) {
-                $usable++;
-            }
-        }
-
-        return $usable >= 2;
+    /**
+     * The members still usable as a merge pair, in list order. A member that is
+     * gone or already retired cannot be the survivor or the source of a merge.
+     *
+     * @return list<ReviewMember>
+     */
+    public function usableMembers(): array
+    {
+        return array_values(array_filter(
+            $this->members,
+            static fn (ReviewMember $member): bool => ! $member->missing && ! $member->retired,
+        ));
     }
 
     public function hasStaleMember(): bool

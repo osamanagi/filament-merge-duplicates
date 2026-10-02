@@ -5,6 +5,8 @@ namespace Nagi\FilamentMergeDuplicates;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
+use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateAuditPage;
+use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateMergePage;
 use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateReviewPage;
 
 /**
@@ -74,6 +76,8 @@ class FilamentMergeDuplicatesPlugin implements Plugin
     {
         $panel->pages([
             DuplicateReviewPage::class,
+            DuplicateMergePage::class,
+            DuplicateAuditPage::class,
         ]);
     }
 

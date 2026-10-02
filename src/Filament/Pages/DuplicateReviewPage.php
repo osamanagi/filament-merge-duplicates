@@ -2,7 +2,6 @@
 
 namespace Nagi\FilamentMergeDuplicates\Filament\Pages;
 
-use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Panel;
@@ -11,7 +10,6 @@ use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
 use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
 use Nagi\FilamentMergeDuplicates\Exceptions\MissingContext;
 use Nagi\FilamentMergeDuplicates\Filament\Concerns\HasDuplicateSuggestions;
-use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesPlugin;
 use Nagi\FilamentMergeDuplicates\Scanning\ReviewGroupQuery;
 use Nagi\FilamentMergeDuplicates\Scanning\ReviewState;
 use Nagi\FilamentMergeDuplicates\Scanning\ReviewSummary;
@@ -180,6 +178,7 @@ final class DuplicateReviewPage extends Page
         }
 
         return [
+            'definitionId' => $definition->id(),
             'definitionLabel' => $definition->label(),
             'bannerView' => $this->duplicateBannerView(),
             'state' => $summary->state,
@@ -188,11 +187,25 @@ final class DuplicateReviewPage extends Page
             'lastPage' => $lastPage,
             'total' => $total,
             'canScan' => $this->mayScan($summary),
+            'canMerge' => $this->mayMerge(),
             'scanLabel' => (string) trans(
                 'filament-merge-duplicates::merge-duplicates.actions.'
                 . ($summary->state === ReviewState::Failed ? 'retry_scan' : 'scan'),
             ),
         ];
+    }
+
+    /**
+     * Whether a compare link should be offered. A missing context is treated as
+     * "no": a panel must not break for a guest.
+     */
+    private function mayMerge(): bool
+    {
+        try {
+            return $this->canMergeDuplicates();
+        } catch (MissingContext) {
+            return false;
+        }
     }
 
     /**
@@ -210,25 +223,5 @@ final class DuplicateReviewPage extends Page
         } catch (MissingContext) {
             return false;
         }
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function panelDefinitionIds(): array
-    {
-        $panel = Filament::getCurrentOrDefaultPanel();
-
-        if ($panel === null || ! $panel->hasPlugin('filament-merge-duplicates')) {
-            return [];
-        }
-
-        $plugin = $panel->getPlugin('filament-merge-duplicates');
-
-        if (! $plugin instanceof FilamentMergeDuplicatesPlugin) {
-            return [];
-        }
-
-        return $plugin->getDefinitions();
     }
 }

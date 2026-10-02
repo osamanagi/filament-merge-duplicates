@@ -23,6 +23,7 @@ use Nagi\FilamentMergeDuplicates\Merging\Fingerprinter;
 use Nagi\FilamentMergeDuplicates\Merging\LockManager;
 use Nagi\FilamentMergeDuplicates\Merging\MergeExecutor;
 use Nagi\FilamentMergeDuplicates\Merging\MergePlanner;
+use Nagi\FilamentMergeDuplicates\Merging\MergePreviewService;
 use Nagi\FilamentMergeDuplicates\Merging\PreviewStore;
 use Nagi\FilamentMergeDuplicates\Merging\RelationPlanBuilder;
 use Nagi\FilamentMergeDuplicates\Merging\RetryPolicy;
@@ -31,6 +32,7 @@ use Nagi\FilamentMergeDuplicates\Relations\HasManyTransfer;
 use Nagi\FilamentMergeDuplicates\Relations\LockingWriterGuard;
 use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
 use Nagi\FilamentMergeDuplicates\Retirement\SurvivorResolver;
+use Nagi\FilamentMergeDuplicates\Scanning\DirectPairMatcher;
 use Nagi\FilamentMergeDuplicates\Scanning\DismissalService;
 use Nagi\FilamentMergeDuplicates\Scanning\KeyBuilder;
 use Nagi\FilamentMergeDuplicates\Scanning\ReviewGroupQuery;
@@ -114,6 +116,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
 
         $this->app->singleton(ScanCoordinator::class);
         $this->app->singleton(DismissalService::class);
+        $this->app->singleton(DirectPairMatcher::class);
         $this->app->singleton(SuggestionQuery::class);
         $this->app->singleton(ReviewSummaryQuery::class);
         $this->app->singleton(ScanStarter::class);
@@ -140,6 +143,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         );
 
         $this->app->singleton(MergePlanner::class);
+        $this->app->singleton(MergePreviewService::class);
 
         $this->app->singleton(LockManager::class);
         $this->app->singleton(AuditWriter::class);

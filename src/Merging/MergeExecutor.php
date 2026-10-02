@@ -286,16 +286,7 @@ final class MergeExecutor
      */
     private function assertPlanIsConfirmable(MergePlan $plan): void
     {
-        $resolvable = [];
-
-        foreach ($plan->differences as $difference) {
-            if ($difference->resolution->requiresChoice()) {
-                $resolvable[] = 'domain_conflict: the field [' . $difference->label
-                    . '] has two different values, so an explicit choice is required.';
-            }
-        }
-
-        $fatal = array_values(array_diff($plan->blockers, $resolvable));
+        $fatal = $plan->fatalBlockers();
 
         if ($fatal !== []) {
             throw new DomainConflict('This merge preview cannot be executed: ' . implode(' ', $fatal));

@@ -103,6 +103,18 @@
                             {{ trans($translation . 'showing_of', ['shown' => count($group->members), 'total' => $group->memberCount]) }}
                         </p>
                     @endunless
+
+                    @php($usable = $group->usableMembers())
+                    @if ($canMerge && count($usable) >= 2)
+                        <div>
+                            <a
+                                href="{{ \Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateMergePage::urlForPair($definitionId, $usable[0]->recordId->value, $usable[1]->recordId->value) }}"
+                                class="fi-btn inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-gray-950/10 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:ring-white/20 dark:hover:bg-white/5"
+                            >
+                                {{ trans($translation . 'compare') }}
+                            </a>
+                        </div>
+                    @endif
                 </article>
             @endforeach
         </section>

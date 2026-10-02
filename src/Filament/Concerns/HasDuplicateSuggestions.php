@@ -2,14 +2,17 @@
 
 namespace Nagi\FilamentMergeDuplicates\Filament\Concerns;
 
+use Filament\Facades\Filament;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\View;
+use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
 use Nagi\FilamentMergeDuplicates\Exceptions\MissingContext;
 use Nagi\FilamentMergeDuplicates\Filament\Banner\DuplicateBanner;
 use Nagi\FilamentMergeDuplicates\Filament\Banner\DuplicateBannerFactory;
+use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesPlugin;
 
 /**
  * The resource-side integration: everything a host page needs to show duplicate
@@ -68,6 +71,33 @@ trait HasDuplicateSuggestions
     }
 
     /**
+     * The remaining abilities are answered by the definition's own authorizer,
+     * so a page never grants itself a capability the host did not configure.
+     *
+     * @throws MissingContext when no trusted context exists
+     */
+    public function canMergeDuplicates(): bool
+    {
+        return $this->duplicateDefinition()->authorizer()->allows($this->duplicateContext(), Ability::Merge);
+    }
+
+    /**
+     * @throws MissingContext when no trusted context exists
+     */
+    public function canDismissDuplicates(): bool
+    {
+        return $this->duplicateDefinition()->authorizer()->allows($this->duplicateContext(), Ability::Dismiss);
+    }
+
+    /**
+     * @throws MissingContext when no trusted context exists
+     */
+    public function canViewDuplicateAudit(): bool
+    {
+        return $this->duplicateDefinition()->authorizer()->allows($this->duplicateContext(), Ability::ViewAudit);
+    }
+
+    /**
      * The review banner, or null when this actor gets no banner.
      *
      * @throws InvalidConfiguration when the ID is not registered
@@ -95,5 +125,31 @@ trait HasDuplicateSuggestions
             $reviewUrl,
             $scanAction,
         );
+    }
+
+    /**
+     * The definition IDs the current panel exposes.
+     *
+     * This is the page-side allowlist: a URL that names a definition the panel
+     * does not expose must be rejected before the registry is consulted, so a
+     * forged ID cannot probe definitions from another panel.
+     *
+     * @return list<string>
+     */
+    protected function panelDefinitionIds(): array
+    {
+        $panel = Filament::getCurrentOrDefaultPanel();
+
+        if ($panel === null || ! $panel->hasPlugin('filament-merge-duplicates')) {
+            return [];
+        }
+
+        $plugin = $panel->getPlugin('filament-merge-duplicates');
+
+        if (! $plugin instanceof FilamentMergeDuplicatesPlugin) {
+            return [];
+        }
+
+        return $plugin->getDefinitions();
     }
 }

@@ -1,14 +1,15 @@
 # M5 handover — Filament experience (in progress)
 
-Status: **M5 is not finished and its gate is not met.** Five slices are implemented
-and tested on both majors; slice 5 (merge preview, dismissal, audit view) and slice 6
-(accessibility, assets, browser review) remain.
+Status: **M5 is not finished and its gate is not met.** Six slices are implemented
+and tested on both majors; slice 6 (accessibility, assets, browser review) remains,
+as do the real-engine page tests for the merge success and stale-refresh paths.
 
 ## Branch state
 
 - Working branch: `m5/filament-experience`
-- Latest commit: this commit (review page, host trait, plugin page registration)
-- Earlier M5 commits: `f0b2702` (handover), `e76631d` (authorized scan starter),
+- Latest commit: this commit (merge preview, confirmation, dismissal and audit pages)
+- Earlier M5 commits: `b4fed81` (review page, host trait, plugin page registration),
+  `f0b2702` (handover), `e76631d` (authorized scan starter),
   `dd03dd2` (review summary), `a13278b` (banner), `0226bf3` (review list)
 - `main` is at `61f726f` (M4 merged via PR #5). M0–M4 are complete and merged.
 - Spec: `filament-merge-duplicates-implementation-plan.md` — §4 (UI, lines 71–95), §5 (integration API),
@@ -22,7 +23,8 @@ and tested on both majors; slice 5 (merge preview, dismissal, audit view) and sl
 | Banner | `a13278b` | `src/Filament/Banner/DuplicateBanner.php`, `DuplicateBannerFactory.php`, `resources/views/banner.blade.php`, `resources/lang/{en,ar}/merge-duplicates.php`, `tests/Feature/DuplicateBannerTest.php`, fixture `tests/Fixtures/Definitions/BannerResourceDuplicates.php` |
 | Review list | `0226bf3` | `src/Scanning/ReviewGroupQuery.php`, `ReviewGroup.php`, `ReviewMember.php`, `tests/Feature/ReviewGroupQueryTest.php` |
 | Authorized scan seam | `e76631d` | `src/Scanning/ScanStarter.php`, `tests/Feature/ScanStarterTest.php` |
-| Review page + host trait + plugin wiring | this commit | `src/Filament/Pages/DuplicateReviewPage.php`, `src/Filament/Concerns/HasDuplicateSuggestions.php`, `resources/views/review-page.blade.php`, `src/FilamentMergeDuplicatesPlugin.php`, `resources/lang/{en,ar}/merge-duplicates.php`, `tests/Feature/DuplicateReviewPageTest.php`, fixture `tests/Fixtures/Livewire/DuplicateBannerProbe.php`, `docs/compatibility.md`, `docs/test-case-map.md` |
+| Review page + host trait + plugin wiring | `b4fed81` | `src/Filament/Pages/DuplicateReviewPage.php`, `src/Filament/Concerns/HasDuplicateSuggestions.php`, `resources/views/review-page.blade.php`, `src/FilamentMergeDuplicatesPlugin.php`, `resources/lang/{en,ar}/merge-duplicates.php`, `tests/Feature/DuplicateReviewPageTest.php`, fixture `tests/Fixtures/Livewire/DuplicateBannerProbe.php`, `docs/compatibility.md`, `docs/test-case-map.md` |
+| Merge preview, dismissal and audit | this commit | `src/Filament/Pages/DuplicateMergePage.php`, `DuplicateAuditPage.php`, `resources/views/{merge-page,audit-page}.blade.php`, `src/Merging/MergePreviewService.php`, `src/Scanning/DirectPairMatcher.php`, `src/Merging/MergePlan.php`, `src/FilamentMergeDuplicatesPlugin.php`, `tests/Feature/DuplicateMergePageTest.php`, `tests/Unit/Merging/MergePlanResolutionTest.php`, `tests/Unit/Scanning/DirectPairMatcherTest.php` |
 
 Guarantees these already enforce (do not regress them):
 
@@ -74,15 +76,36 @@ Guarantees these already enforce (do not regress them):
 - Blade renders the embedded banner `View` with `{!! ... !!}` rather than `{{ ... }}`:
   `{{ }}` HTML-escapes a `View` here even though it implements `Htmlable`.
 
-## Remaining after slice 4
+## Slice 5 — implemented (this commit)
 
-- Slice 5: merge preview (field comparison grid, survivor choice with older-`created_at`
-  then stable-ID recommendation, explicit choices that rebuild the preview and
-  invalidate prior tokens, relationship impact text from configured labels, blocker
-  display, retirement warning, confirmation that calls the M4 `MergeExecutor`,
-  success with survivor + audit reference, stale → refresh, failure → never success),
-  dismissal ("not duplicates" dismisses the pair only), the direct-match manual pair
-  action, and the audit view gated by `Ability::ViewAudit`.
+- **Merge preview** (`src/Filament/Pages/DuplicateMergePage.php`) builds a server-side
+  plan through `MergePreviewService` and shows the field comparison grid, the survivor
+  choice (defaulting to the planner's older-`created_at` then stable-ID recommendation),
+  relationship impact text, blockers and the retirement warning. Changing the survivor
+  rebuilds the plan and clears prior choices, so the old operation identifier is dead.
+- **Confirmation** calls the M4 `MergeExecutor` with the field choices. Success shows
+  the survivor and the audit reference; a stale preview is reported and the plan
+  rebuilt; any failure is reported by its sanitized code and never as success.
+- **Dismissal** calls `DismissalService` for the pair only, then returns to the review
+  page.
+- **Audit view** (`DuplicateAuditPage`) reads one entry through `AuditReader`, so
+  `Ability::ViewAudit` and the scope check are enforced before anything is decrypted.
+- **Direct match** is enforced on the preview: `DirectPairMatcher` recomputes the rule
+  digests, and a pair that no longer matches becomes a fatal blocker rather than a
+  merge. This is the domain half of the manual pair action; a host resource-table action
+  that calls `DuplicateMergePage::urlForPair()` is still to be added, because the package
+  ships no resource to attach it to.
+- `MergePlan` now derives `choiceFields()`, `resolvableBlockers()`, `fatalBlockers()`,
+  `choicesComplete()` and `canConfirm()` from the differences, and the planner and
+  executor share one `choiceBlockerFor()` wording instead of duplicating it.
+
+Still outstanding: a real-engine page test for the success and stale-refresh paths, the
+host resource-table manual action, accessibility, assets and manual browser review. The
+engine-refusal path is tested on SQLite, and the executor's success path is already
+proven in M4.
+
+## Remaining after slice 5
+
 - Slice 6: accessibility (dark, RTL, keyboard, visible focus, labelled radios,
   non-colour indicators, escaped values, rich text as plain text in v1), asset
   registration (currently commented out in the provider; `bin/build.js` builds only
@@ -98,8 +121,10 @@ Guarantees these already enforce (do not regress them):
 > updates, modal actions, hooks and asset rendering. Use the completed executor; no
 > duplicate business logic in actions.
 
-Case-map rows still `not started`: `U01`, `U02`, `A05`, `C06` and `C07` are partial
-(`C02`/`C05` have M0 evidence only). Update `docs/test-case-map.md` as each lands.
+Case-map rows: `A05`, `C02`, `C05`, `C06`, `C07`, `U01` and `U02` are partial, with
+slice-4/5 evidence recorded in `docs/test-case-map.md`. Modal actions, render hooks,
+asset rendering, the real-engine success/stale page paths and manual browser review
+are what still keep the M5 gate unmet.
 
 ## Decisions already made (do not re-litigate without reason)
 
@@ -128,7 +153,7 @@ Case-map rows still `not started`: `U01`, `U02`, `A05`, `C06` and `C07` are part
 ## Verification commands for this branch
 
 ```bash
-./vendor/bin/pest --no-coverage            # 291 passed, 1 skipped, 927 assertions
+./vendor/bin/pest --no-coverage            # 311 passed, 1 skipped, 982 assertions
 ./vendor/bin/phpstan analyse --memory-limit=1G
 ./vendor/bin/pint --test
 ./vendor/bin/pest --coverage --min=0       # coverage total (pcov; xdebug is absent)

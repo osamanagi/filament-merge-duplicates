@@ -127,6 +127,14 @@ same cross-major reason as the banner: the rendered output is then identical on 
 majors without a version check. Modal actions, render hooks and asset rendering are
 **not** verified here and remain open for the M5 gate.
 
+M5 slice 5 added the pair comparison, merge confirmation and audit pages on the same
+page/route/parameter surfaces, plus Livewire state updates that rebuild a server-side
+plan (`setSurvivor`, `setChoice`), Filament notification assertions (`assertNotified`)
+and a redirect on dismissal (`assertRedirect`). Those additions were read on both
+majors and the suite passed on both lanes: 311 passed, 1 skipped, 982 assertions each
+(Filament 4.14.0/Livewire 3.8.10 and Filament 5.9.0/Livewire 4.4.7). The new page tests
+are `tests/Feature/DuplicateMergePageTest.php`.
+
 ## Re-verification points
 
 | Milestone | Must re-verify |
