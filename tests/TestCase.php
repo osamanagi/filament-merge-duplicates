@@ -66,7 +66,28 @@ class TestCase extends Orchestra
 
     public function getEnvironmentSetUp($app): void
     {
+        // A file-backed SQLite database is used instead of :memory: because the
+        // in-memory database is shared for the whole test process, which makes
+        // the framework's schema refresh non-deterministic. A file database
+        // gives every refresh a real drop-and-recreate.
+        $database = dirname(__DIR__) . '/build/testing.sqlite';
+
+        if (! is_dir(dirname($database))) {
+            mkdir(dirname($database), 0755, true);
+        }
+
+        if (! file_exists($database)) {
+            touch($database);
+        }
+
         $app['config']->set('database.default', 'testing');
+        $app['config']->set('database.connections.testing', [
+            'driver' => 'sqlite',
+            'database' => $database,
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+        ]);
+
         $app['config']->set('auth.providers.users.model', User::class);
         $app['config']->set('app.key', 'base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=');
     }
