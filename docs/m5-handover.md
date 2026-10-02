@@ -122,11 +122,11 @@ proven in M4.
 - **Escaping**: tests pin that record markup is escaped in the review list, the
   comparison grid and the audit view.
 
-## Remaining for M5
+## Remaining for M5 (deferred to the demo phase)
 
-- **Manual browser review on both majors** (layout and keyboard behaviour). This is the
-  only gate item that cannot be checked from the test suite.
-- **Render hooks** are still unexercised.
+- **Manual browser review on both majors** (layout and keyboard behaviour).
+- **Render hooks** — no genuine use in the package yet, so deferred to the demo phase
+  rather than added for the gate. Agreed with the maintainer.
 - Decision (agreed): the host resource-table manual pair action is left to the
   consumer/demo. The domain guard (`DirectPairMatcher`) and
   `DuplicateMergePage::urlForPair()` are in place for it.
