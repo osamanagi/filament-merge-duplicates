@@ -124,11 +124,12 @@ majors; the only markup difference observed is the surrounding panel chrome
 
 ## Still open after this walkthrough
 
-- **Render hooks.** No genuine use in the package yet; deferred to the demo phase by
-  agreement. The demo banner is therefore not yet rendered above a resource table.
 - **A queued (asynchronous) scan.** Both demos run `QUEUE_CONNECTION=sync`, so the browser
   path is queued but drained inline. A worker-based run (`database` queue plus
   `php artisan queue:work`) still has to be walked through once, which also exercises
   `failed()` and retry handling for the chunk job.
-- **Dismissal journey.** "Not duplicates" was not exercised in the browser on either major;
-  dismissal is covered by tests and is on the M6 list.
+- **Dismissal journey.** "Not duplicates" was exercised in the browser on Filament 4 but
+  not by hand on Filament 5; dismissal is covered by tests on both majors.
+- **Demo data for every state.** The demo seeders currently create a mergeable pair only.
+  Blank, conflicting-choice, dismissed and blocked cases are still to be seeded so the
+  walkthrough can show each state without hand-editing rows.

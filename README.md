@@ -325,11 +325,56 @@ The pages build their own URLs through
 `DuplicateAuditPage::urlForOperation()`, so a host never has to reproduce a route
 name.
 
-### 5. Optional: put the suggestion count on the resource list page
+### 5. Optional: put the suggestion count above the resource table
 
-`HasDuplicateSuggestions` gives a resource page a banner for one definition. It
-delegates every check to the same services the pages use, so a page cannot widen
-what an actor sees:
+A panel render hook is enough. The package supplies the banner and its review URL;
+the host decides where it belongs:
+
+```php
+<?php
+
+namespace App\Providers\Filament;
+
+use Closure;
+use Filament\Panel;
+use Filament\PanelProvider;
+use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\View\View;
+use Nagi\FilamentMergeDuplicates\Filament\Banner\DuplicateBannerFactory;
+use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateReviewPage;
+
+class AdminPanelProvider extends PanelProvider
+{
+    public function panel(Panel $panel): Panel
+    {
+        return $panel
+            // ... the panel's other configuration
+            ->renderHook(
+                PanelsRenderHook::RESOURCE_PAGES_LIST_RECORDS_TABLE_BEFORE,
+                $this->duplicateBanner('filament.admin.resources.shop.customers.index', 'shop-customers'),
+            );
+    }
+
+    private function duplicateBanner(string $routeName, string $definitionId): Closure
+    {
+        return fn (): ?View => request()->routeIs($routeName)
+            ? app(DuplicateBannerFactory::class)->viewFor(
+                $definitionId,
+                DuplicateReviewPage::urlForDefinition($definitionId),
+            )
+            : null;
+    }
+}
+```
+
+The route guard keeps the banner on its own resource instead of every list page.
+`viewFor()` returns `null` for an actor without the review ability and for a guest,
+so the hook never has to guard those cases and a panel never breaks for someone who
+may not see a count. Pass a rendered scan action as the third argument if the banner
+should offer one; otherwise the scan action stays on the review page.
+
+The same banner is available inside a page through the `HasDuplicateSuggestions`
+trait, which delegates every check to the same services:
 
 ```php
 <?php
@@ -353,9 +398,7 @@ class ListCustomers extends ListRecords
 }
 ```
 
-`duplicateBannerView()` returns a rendered banner for the definition — or `null`
-for an actor without the review ability and for a guest, so a panel never breaks
-for someone who is not allowed to see a count.
+`duplicateBannerView()` returns the rendered banner for the trait's definition.
 
 ## Authorization
 
