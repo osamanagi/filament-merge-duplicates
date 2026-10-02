@@ -77,6 +77,8 @@ return [
         'empty_body' => 'The last scan completed and found no group you can review.',
         'never_scanned_body' => 'This resource has not been scanned yet. Run a scan to look for possible duplicates.',
         'scan_already_running' => 'A scan is already running for this scope.',
+        'scan_confirm_heading' => 'Start a duplicate scan?',
+        'scan_confirm_description' => 'The scan runs in the background and replaces the current results when it finishes.',
         'compare' => 'Review two records',
     ],
 

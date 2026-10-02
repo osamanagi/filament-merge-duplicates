@@ -124,8 +124,8 @@ Filament 5.9.0 / Livewire 4.4.7 / Laravel 12.69.3 / Testbench 10.12.0 —
 No compatibility adapter was needed for these surfaces. The page deliberately uses
 plain semantic markup and `wire:click` rather than Filament Blade components, for the
 same cross-major reason as the banner: the rendered output is then identical on both
-majors without a version check. Modal actions and render hooks are **not** verified
-here and remain open for the M5 gate.
+majors without a version check. Render hooks are **not** verified here and remain open
+for the M5 gate; Filament actions are, see below.
 
 M5 slice 5 added the pair comparison, merge confirmation and audit pages on the same
 page/route/parameter surfaces, plus Livewire state updates that rebuild a server-side
@@ -143,13 +143,16 @@ fixture is driven through the same pages in
 `tests/Feature/FilamentTwoModelJourneyTest.php`, which also checks that record markup
 is escaped. `tests/Execution/MergePageJourneyTest.php` then confirms a merge through
 the page and verifies that a pair changed after the preview is refused, on both MySQL
-and PostgreSQL. Both lanes ran 325 passed, 1 skipped, 1034 assertions each.
+and PostgreSQL. A Filament action with a confirmation modal is mounted and called on
+the review page (`mountAction`/`assertActionMounted`/`assertMountedActionModalSee`/
+`callMountedAction`), which exercises the action and modal surfaces on a real page on
+both majors. Both lanes ran 326 passed, 1 skipped, 1043 assertions each.
 
 ## Re-verification points
 
 | Milestone | Must re-verify |
 | --- | --- |
-| M5 | Page/route/navigation and Livewire state surfaces: verified on both majors (see above). Asset registration verified; modal actions, render hooks and manual browser review are outstanding. |
+| M5 | Page/route/navigation, Livewire state, Filament action/modal and asset surfaces: verified on both majors (see above). Render hooks and manual browser review are outstanding. |
 | M6 | A Filament 4 → 5 upgrade against existing package data, without a data reset |
 | M7 | Full matrix, resolved version range matching the published constraints |
 

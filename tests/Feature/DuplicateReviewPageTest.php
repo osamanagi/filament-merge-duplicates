@@ -473,3 +473,25 @@ it('carries the host review link once groups exist', function () {
         ->assertOk()
         ->assertSee('https://example.test/review', escape: false);
 });
+
+it('confirms a scan through a Filament modal action', function () {
+    $definition = reviewPageDefinition('fixture-review-page-modal');
+    reviewPagePanel(['fixture-review-page-modal']);
+
+    $context = reviewPageContext($definition);
+
+    livewire(DuplicateReviewPage::class, ['definition' => 'fixture-review-page-modal'])
+        ->assertOk()
+        ->assertActionExists('confirmScan')
+        ->assertActionVisible('confirmScan')
+        ->mountAction('confirmScan')
+        ->assertActionMounted('confirmScan')
+        ->assertMountedActionModalSee('Start a duplicate scan?');
+
+    livewire(DuplicateReviewPage::class, ['definition' => 'fixture-review-page-modal'])
+        ->mountAction('confirmScan')
+        ->callMountedAction()
+        ->assertOk();
+
+    expect(ScanRecord::on($context->connection)->count())->toBe(1);
+});

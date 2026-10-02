@@ -2,6 +2,7 @@
 
 namespace Nagi\FilamentMergeDuplicates\Filament\Pages;
 
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Panel;
@@ -188,11 +189,36 @@ final class DuplicateReviewPage extends Page
             'total' => $total,
             'canScan' => $this->mayScan($summary),
             'canMerge' => $this->mayMerge(),
-            'scanLabel' => (string) trans(
-                'filament-merge-duplicates::merge-duplicates.actions.'
-                . ($summary->state === ReviewState::Failed ? 'retry_scan' : 'scan'),
-            ),
         ];
+    }
+
+    /**
+     * The scan is offered as a Filament action with a confirmation modal, so a
+     * long-running operation is not started by a single stray click. The action
+     * calls the same authorized service as before, so this changes the control,
+     * not the check.
+     */
+    public function confirmScanAction(): Action
+    {
+        return Action::make('confirmScan')
+            ->label(fn (): string => $this->scanLabel())
+            ->requiresConfirmation()
+            ->modalHeading((string) trans('filament-merge-duplicates::merge-duplicates.review.scan_confirm_heading'))
+            ->modalDescription((string) trans('filament-merge-duplicates::merge-duplicates.review.scan_confirm_description'))
+            ->modalSubmitActionLabel((string) trans('filament-merge-duplicates::merge-duplicates.actions.scan'))
+            ->action(fn () => $this->startScan());
+    }
+
+    private function scanLabel(): string
+    {
+        $state = app(ReviewSummaryQuery::class)
+            ->for($this->duplicateDefinition(), $this->duplicateContext())
+            ->state;
+
+        return (string) trans(
+            'filament-merge-duplicates::merge-duplicates.actions.'
+            . ($state === ReviewState::Failed ? 'retry_scan' : 'scan'),
+        );
     }
 
     /**
