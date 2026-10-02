@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton\Commands;
+namespace Nagi\FilamentMergeDuplicates\Commands;
 
 use Illuminate\Console\Command;
 
-class SkeletonCommand extends Command
+class FilamentMergeDuplicatesCommand extends Command
 {
-    public $signature = 'skeleton';
+    public $signature = 'filament-merge-duplicates';
 
     public $description = 'My command';
 
