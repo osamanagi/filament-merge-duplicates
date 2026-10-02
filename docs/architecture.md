@@ -65,6 +65,7 @@ Recorded as ADRs:
 - [0005 — Audit content, encryption and retention](adr/0005-audit-and-encryption.md)
 - [0006 — Record ID and field value codecs](adr/0006-id-and-field-codecs.md)
 - [0007 — Persistence schema](adr/0007-persistence-schema.md)
+- [0008 — PHP baseline, Filament 5 and the test-tooling boundary](adr/0008-php-baseline-and-tooling.md)
 
 ## M0 evidence
 

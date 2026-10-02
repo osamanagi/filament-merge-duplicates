@@ -75,7 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.2', '8.4']
+        php: ['8.2', '8.3', '8.4']
         lane: [f4-lowest, f4-current, f5-lowest, f5-current]
         include:
           - lane: f4-lowest
@@ -90,6 +90,15 @@ jobs:
           - lane: f5-current
             constraint: '^5.0'
             flags: ''
+        exclude:
+          # Filament 5 itself installs on PHP 8.2 (proven by the resolve job),
+          # but this package's dev tooling - Pest 4, PHPUnit 12, Pint - requires
+          # PHP 8.3+, so the Filament 5 test suite cannot execute on PHP 8.2.
+          # PHP 8.2 is covered by the Filament 4 lanes and by the resolve job.
+          - php: '8.2'
+            lane: f5-lowest
+          - php: '8.2'
+            lane: f5-current
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -125,6 +134,35 @@ jobs:
         # job that provisions a coverage driver. Pest's --ci flag requests
         # coverage, so the lanes must not use it.
         run: vendor/bin/pest --no-coverage --colors=never
+
+  resolve:
+    name: Resolve ${{ matrix.constraint }} on PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+
+    # Proves the published "require" constraints install for both Filament
+    # majors on the minimum supported PHP and on current PHP, independently of
+    # whether the test tooling can execute there. This is the C03 evidence for
+    # the PHP lower bound.
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+        constraint: ['^4.0', '^5.0']
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip, bcmath, intl, fileinfo
+          coverage: none
+
+      - name: Resolve published constraints
+        run: bin/resolve-lane.sh '${{ matrix.constraint }}'
 
   coverage:
     name: Coverage draft (${{ matrix.lane }})

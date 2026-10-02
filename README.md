@@ -92,6 +92,11 @@ return [
 | Livewire | constraining version comes from Filament: 3.x on Filament 4, 4.x on Filament 5 |
 | Merge execution database | MySQL 8 (InnoDB) or PostgreSQL 15+ |
 
+PHP 8.2 supports both Filament majors. One caveat is worth knowing up front: Filament 5
+installs on PHP 8.2, but this package's test tooling needs PHP 8.3+, so Filament 5
+behaviour is verified on 8.3 and 8.4. See
+[docs/compatibility.md](docs/compatibility.md) and [ADR 0008](docs/adr/0008-php-baseline-and-tooling.md).
+
 SQLite can run detection and UI tests, but merge execution refuses it because it
 cannot provide equivalent row-lock guarantees.
 

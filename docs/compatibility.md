@@ -18,6 +18,29 @@ the ones actually resolved and executed, recorded from `composer.lock`.
 Local PHP for these runs was 8.4.22. The published minimum PHP 8.2 is exercised in
 CI only; it is not claimed as locally verified.
 
+### PHP baseline
+
+PHP 8.2 is supported, but it is covered differently per major:
+
+| Combination | Installable | Test suite executed in CI |
+| --- | --- | --- |
+| Filament 4 on PHP 8.2 | Yes | Yes |
+| Filament 4 on PHP 8.3 / 8.4 | Yes | Yes |
+| Filament 5 on PHP 8.2 | Yes | **No** — dev tooling needs PHP 8.3+ |
+| Filament 5 on PHP 8.3 / 8.4 | Yes | Yes |
+
+Filament 5 on PHP 8.2 installs. A throwaway consumer project requiring the package plus
+`filament/filament:^5.0` resolves with `php: 8.2` as platform and installs Filament 5.9.0,
+Livewire 4.4.7 and Laravel 12.69.3. What needs PHP 8.3+ is the package's test tooling:
+Pest 4, PHPUnit 12, Pint and `brianium/paratest`, reached through
+Filament 5 → Livewire 4 → `pest-plugin-livewire` 4 → Pest 4. There is no Pest 3 line that
+supports Livewire 4.
+
+So `bin/resolve-lane.sh` proves installability on the minimum PHP for both majors as a
+required CI job, and the Filament 5 lanes execute on 8.3 and 8.4. See
+[ADR 0008](adr/0008-php-baseline-and-tooling.md). "Installable" and "behaviourally
+verified" are not the same claim, and the support matrix says which is which.
+
 For comparison, this machine previously resolved `laravel/framework` 13.34.0 via
 Testbench 11. That pairing is outside the published support promise and is no
 longer used: the development stack is pinned to Testbench 10 (Laravel 12).
@@ -64,7 +87,13 @@ bin/lane-test.sh '^5.0'                  # Filament 5, current set
 bin/lane-test.sh '^5.0' --prefer-lowest  # Filament 5, lowest permitted set
 ```
 
-These four commands are the same lanes CI runs.
+These four commands are the same lanes CI runs. Published constraints are verified
+separately, including on PHP versions the test tooling cannot run on:
+
+```bash
+bin/resolve-lane.sh '^4.0'         # resolve as the local PHP
+bin/resolve-lane.sh '^5.0' 8.2.0   # resolve as if the host ran PHP 8.2
+```
 
 ## Re-verification points
 
@@ -79,7 +108,9 @@ These four commands are the same lanes CI runs.
 - `--prefer-lowest` resolves 4.12.6 / 5.7.6 rather than 4.0.0 / 5.0.0, because
   Filament's own sub-package minimums dominate. The lowest genuinely resolvable
   set is what is tested.
-- PHP 8.2 is not available locally, so the PHP minimum lane is CI-only.
+- PHP 8.2 is not available locally, so the PHP minimum lanes are CI-only.
+- Filament 5 behaviour is not executed on PHP 8.2, only proven installable there
+  (ADR 0008).
 - PHP 8.4 emits a `symfony/translation` implicit-nullable deprecation on the
   lowest lanes. It is a vendor deprecation, not a package failure; it is recorded
   rather than suppressed.

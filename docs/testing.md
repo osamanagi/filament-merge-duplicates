@@ -20,6 +20,17 @@ composer check          # lint + static analysis + tests
 composer test:coverage  # pest --coverage --min=100
 ```
 
+Lanes:
+
+```bash
+bin/lane-test.sh '^4.0' --prefer-lowest   # run a lane in an isolated copy
+bin/resolve-lane.sh '^5.0' 8.2.0          # prove published constraints resolve
+```
+
+`bin/resolve-lane.sh` exists because Filament 5 is installable on PHP 8.2 while the test
+tooling is not. Resolution is verified separately so the PHP lower bound is genuinely
+tested rather than assumed. See [ADR 0008](adr/0008-php-baseline-and-tooling.md).
+
 ## Coverage gate
 
 - Driver: **pcov** (xdebug is not installed).

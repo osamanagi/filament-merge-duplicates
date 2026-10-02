@@ -103,7 +103,7 @@ Last updated: M0 (compatibility spike and design freeze).
 | --- | --- | --- | --- |
 | C01 | not started | `tests/Concurrency/LockSpikeTest.php` | M0 evidence: merge execution refusal of SQLite is proven, and locking is proven on real MySQL 8 and PostgreSQL 15. The full engine/version matrix is M4/M7. |
 | C02 | not started | `tests/Feature/PackageBootTest.php`, `tests/Feature/FilamentActionRenderTest.php` | M0 evidence: both majors install, boot, resolve the panel plugin and render/mount a real action, on all four dependency lanes. Authenticated review and merge journeys are M5. |
-| C03 | not started | `bin/lane-test.sh` | M0 evidence: four lanes resolve and run, and the published constraint `^4.0 \|\| ^5.0` resolves for both majors. PHP 8.2 and CI enforcement are pending. |
+| C03 | not started | `bin/lane-test.sh`, `bin/resolve-lane.sh` | M0 evidence: four lanes resolve and run, the published constraint `^4.0 \|\| ^5.0` resolves for both majors, and a separate required CI job proves installation on PHP 8.2, 8.3 and 8.4 for each major. Filament 5 behaviour is not executed on PHP 8.2 (dev tooling needs 8.3+) — see ADR 0008. |
 | C04 | not started | — | 4 → 5 upgrade with existing data is M6. |
 | C05 | not started | `tests/Feature/FilamentActionRenderTest.php` | M0 evidence: no adapter was needed for the surfaces verified so far, and both majors passed identical assertions. Adapter coverage for the full UI is M5. |
 | C06 | not started | — | Two unrelated definitions in one panel is M1/M5. |

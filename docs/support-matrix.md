@@ -15,6 +15,18 @@ clear message rather than a guessed strategy.
 | Laravel 11 / 13 | Not supported in the initial promise |
 | Filament 3 | Not supported |
 
+PHP 8.2 supports both majors. One caveat is recorded here rather than hidden, because
+"installable" and "verified" are different claims:
+
+| Combination | Installable | Package tests executed |
+| --- | --- | --- |
+| Filament 4 on PHP 8.2 | Yes | Yes |
+| Filament 4 on PHP 8.3+ | Yes | Yes |
+| Filament 5 on PHP 8.2 | Yes | No — dev tooling needs PHP 8.3+ |
+| Filament 5 on PHP 8.3+ | Yes | Yes |
+
+See [ADR 0008](adr/0008-php-baseline-and-tooling.md).
+
 ## Database engines
 
 | Engine | Detection, UI, dismissals | Merge execution |
