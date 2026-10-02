@@ -29,10 +29,10 @@ outside the panel must not bypass authorization.
 | `src/Normalization` | Built-in normalizers and their version identifiers |
 | `src/Data` | Key hashing, ID codecs, typed tuple encoding, field codecs |
 | `src/Scanning` | `ScopeManager`, `KeyBuilder`, `ScanChunkProcessor`, `ScanCoordinator`, `SuggestionQuery`, `DismissalService`, `ScanState` |
-| `src/Merging` | `MergePlanner`, `Fingerprinter`, `FieldDiffBuilder`, `SurvivorRecommender`, `RelationPlanBuilder`, `MergePlan`, `PreviewStore` |
-| `src/Retirement` | `RetirementResolver` and the retirement domain digest |
+| `src/Merging` | `MergePlanner`, `MergeExecutor`, `Fingerprinter`, `FieldDiffBuilder`, `SurvivorRecommender`, `RelationPlanBuilder`, `MergePlan`, `MergeResult`, `MergeContext`, `PreviewStore`, `LockManager`, `RetryPolicy`, `AuditWriter`, `AuditReader` |
+| `src/Retirement` | `RetirementResolver`, `SurvivorResolver` and the retirement domain digest |
 | `src/Definitions` | `DefinitionRegistry` in addition to the base class and builders |
-| `src/Relations` | `HasManyTransfer` and the relation inventory validator |
+| `src/Relations` | `HasManyTransfer`, `LockingWriterGuard` and the relation inventory validator |
 | `src/Authorization` | Default deny-by-default authorizer |
 | `src/Models` | Package Eloquent models over the six package tables |
 | `src/Jobs` | Chunked scan jobs, generations publication, bounded cleanup |

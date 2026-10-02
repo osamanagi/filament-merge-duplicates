@@ -25,6 +25,8 @@ return new class extends Migration
             $table->unsignedBigInteger('contact_id')->nullable();
             $table->string('body')->nullable();
             $table->timestamps();
+            // A trashed child is the case the declared soft-delete option decides.
+            $table->softDeletes();
 
             // A composite unique index that two transferred children can
             // collide on, which the planner must block rather than resolve.

@@ -14,4 +14,5 @@ enum Ability: string
     case Dismiss = 'dismiss';
     case Scan = 'scan';
     case Merge = 'merge';
+    case ViewAudit = 'view-audit';
 }
