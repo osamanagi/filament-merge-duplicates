@@ -1,14 +1,16 @@
 # M5 handover — Filament experience (in progress)
 
-Status: **M5 is not finished and its gate is not met.** Six slices are implemented
-and tested on both majors; slice 6 (accessibility, assets, browser review) remains,
-as do the real-engine page tests for the merge success and stale-refresh paths.
+Status: **M5 is not finished and its gate is not met.** Seven slices are implemented
+and tested on both majors. What remains is manual browser review on both majors, modal
+actions/render hooks, and a real-engine page test for the merge success and
+stale-refresh paths.
 
 ## Branch state
 
 - Working branch: `m5/filament-experience`
-- Latest commit: this commit (merge preview, confirmation, dismissal and audit pages)
-- Earlier M5 commits: `b4fed81` (review page, host trait, plugin page registration),
+- Latest commit: this commit (asset registration, two-model suite, escaping)
+- Earlier M5 commits: `f812b6f` (merge preview, confirmation, dismissal, audit),
+  `b4fed81` (review page, host trait, plugin page registration),
   `f0b2702` (handover), `e76631d` (authorized scan starter),
   `dd03dd2` (review summary), `a13278b` (banner), `0226bf3` (review list)
 - `main` is at `61f726f` (M4 merged via PR #5). M0–M4 are complete and merged.
@@ -24,7 +26,8 @@ as do the real-engine page tests for the merge success and stale-refresh paths.
 | Review list | `0226bf3` | `src/Scanning/ReviewGroupQuery.php`, `ReviewGroup.php`, `ReviewMember.php`, `tests/Feature/ReviewGroupQueryTest.php` |
 | Authorized scan seam | `e76631d` | `src/Scanning/ScanStarter.php`, `tests/Feature/ScanStarterTest.php` |
 | Review page + host trait + plugin wiring | `b4fed81` | `src/Filament/Pages/DuplicateReviewPage.php`, `src/Filament/Concerns/HasDuplicateSuggestions.php`, `resources/views/review-page.blade.php`, `src/FilamentMergeDuplicatesPlugin.php`, `resources/lang/{en,ar}/merge-duplicates.php`, `tests/Feature/DuplicateReviewPageTest.php`, fixture `tests/Fixtures/Livewire/DuplicateBannerProbe.php`, `docs/compatibility.md`, `docs/test-case-map.md` |
-| Merge preview, dismissal and audit | this commit | `src/Filament/Pages/DuplicateMergePage.php`, `DuplicateAuditPage.php`, `resources/views/{merge-page,audit-page}.blade.php`, `src/Merging/MergePreviewService.php`, `src/Scanning/DirectPairMatcher.php`, `src/Merging/MergePlan.php`, `src/FilamentMergeDuplicatesPlugin.php`, `tests/Feature/DuplicateMergePageTest.php`, `tests/Unit/Merging/MergePlanResolutionTest.php`, `tests/Unit/Scanning/DirectPairMatcherTest.php` |
+| Merge preview, dismissal and audit | `f812b6f` | `src/Filament/Pages/DuplicateMergePage.php`, `DuplicateAuditPage.php`, `resources/views/{merge-page,audit-page}.blade.php`, `src/Merging/MergePreviewService.php`, `src/Scanning/DirectPairMatcher.php`, `src/Merging/MergePlan.php`, `src/FilamentMergeDuplicatesPlugin.php`, `tests/Feature/DuplicateMergePageTest.php`, `tests/Unit/Merging/MergePlanResolutionTest.php`, `tests/Unit/Scanning/DirectPairMatcherTest.php` |
+| Assets, two-model suite, escaping | this commit | `resources/css/index.css`, `resources/dist/filament-merge-duplicates.css`, `bin/build.js`, `src/FilamentMergeDuplicatesServiceProvider.php`, `tests/Feature/AssetRegistrationTest.php`, `tests/Feature/FilamentTwoModelJourneyTest.php` |
 
 Guarantees these already enforce (do not regress them):
 
@@ -99,19 +102,34 @@ Guarantees these already enforce (do not regress them):
   `choicesComplete()` and `canConfirm()` from the differences, and the planner and
   executor share one `choiceBlockerFor()` wording instead of duplicating it.
 
-Still outstanding: a real-engine page test for the success and stale-refresh paths, the
-host resource-table manual action, accessibility, assets and manual browser review. The
+Still outstanding: a real-engine page test for the success and stale-refresh paths. The
 engine-refusal path is tested on SQLite, and the executor's success path is already
 proven in M4.
 
-## Remaining after slice 5
+## Slice 6 — implemented (this commit)
 
-- Slice 6: accessibility (dark, RTL, keyboard, visible focus, labelled radios,
-  non-colour indicators, escaped values, rich text as plain text in v1), asset
-  registration (currently commented out in the provider; `bin/build.js` builds only
-  `resources/js/index.js` to `resources/dist/filament-merge-duplicates.js`, no CSS
-  build step), the Livewire and forged-request suites on **two unrelated resource
-  models**, and manual browser review on both majors.
+- **Assets**: one package stylesheet is registered through `FilamentAsset::register`.
+  It does not import Filament's theme (the panel already ships it) and adds focus,
+  forced-colours and print robustness. `bin/build.js` now builds the CSS alongside the
+  JS, and `tests/Feature/AssetRegistrationTest.php` asserts both the registration and
+  the file it points at.
+- **Two-model suite**: `tests/Feature/FilamentTwoModelJourneyTest.php` drives the pages
+  on the UUID-keyed, non-soft-deleting fixture - review list, compare link, forged id
+  (404), forged ability (403) and the unmergeable state - so the pages are not tied to
+  the integer-keyed merge fixture.
+- **Escaping**: tests pin that record markup is escaped in the review list, the
+  comparison grid and the audit view.
+
+## Remaining for M5
+
+- **Manual browser review on both majors** (layout and keyboard behaviour). This is the
+  only gate item that cannot be checked from the test suite.
+- **Modal actions and render hooks** are still unexercised; the pages use plain markup
+  and `wire:click`.
+- A real-engine page test for the merge **success** and **stale-refresh** paths.
+- Decision (agreed): the host resource-table manual pair action is left to the
+  consumer/demo. The domain guard (`DirectPairMatcher`) and
+  `DuplicateMergePage::urlForPair()` are in place for it.
 
 ## M5 gate (from the plan) and what is still missing for it
 
@@ -153,7 +171,7 @@ are what still keep the M5 gate unmet.
 ## Verification commands for this branch
 
 ```bash
-./vendor/bin/pest --no-coverage            # 311 passed, 1 skipped, 982 assertions
+./vendor/bin/pest --no-coverage            # 321 passed, 1 skipped, 1004 assertions
 ./vendor/bin/phpstan analyse --memory-limit=1G
 ./vendor/bin/pint --test
 ./vendor/bin/pest --coverage --min=0       # coverage total (pcov; xdebug is absent)

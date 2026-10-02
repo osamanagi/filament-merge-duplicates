@@ -473,3 +473,66 @@ it('links a reviewable group to the compare page', function () {
         ->assertOk()
         ->assertSee('Review two records');
 });
+
+it('escapes record values in the comparison grid', function () {
+    mergePreviewDefinition('fixture-merge-escape', ['review', 'dismiss', 'merge']);
+    mergePreviewPanel(['fixture-merge-escape']);
+
+    $first = Contact::create([
+        'tenant_id' => 'tenant-a',
+        'display_name' => '<script>alert(1)</script>',
+        'reference' => 'SAME',
+    ]);
+    $second = Contact::create(['tenant_id' => 'tenant-a', 'display_name' => 'Plain', 'reference' => 'SAME']);
+
+    livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-merge-escape',
+        'first' => (string) $first->getKey(),
+        'second' => (string) $second->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', escape: false)
+        ->assertDontSee('<script>alert(1)</script>', escape: false);
+});
+
+it('escapes audit values instead of rendering them', function () {
+    $definition = mergePreviewDefinition('fixture-merge-audit-escape', ['review', 'merge', 'view-audit']);
+    mergePreviewPanel(['fixture-merge-audit-escape']);
+
+    [$older, $newer] = mergePreviewPair();
+    $context = mergePreviewContext($definition);
+    $scope = mergePreviewScope($context);
+
+    $operationId = (string) Str::ulid();
+
+    $record = new MergeRecord;
+    $record->setConnection($context->connection);
+    $record->forceFill([
+        'operation_id' => $operationId,
+        'scope_id' => (string) $scope->id,
+        'retirement_domain' => app(RetirementResolver::class)->domainDigest(
+            $context->connection,
+            Contact::class,
+            $definition->ownershipDomain(),
+        ),
+        'source_id' => (string) $newer->getKey(),
+        'source_id_type' => 'int',
+        'survivor_id' => (string) $older->getKey(),
+        'survivor_id_type' => 'int',
+        'actor_ref' => 'actor-1',
+        'definition_revision' => '1',
+        'audit_payload' => app(AuditWriter::class)->encode([
+            'notes' => '<script>alert(1)</script>',
+        ]),
+        'committed_at' => now(),
+    ]);
+    $record->save();
+
+    livewire(DuplicateAuditPage::class, [
+        'definition' => 'fixture-merge-audit-escape',
+        'operation' => $operationId,
+    ])
+        ->assertOk()
+        ->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', escape: false)
+        ->assertDontSee('<script>alert(1)</script>', escape: false);
+});

@@ -2,10 +2,8 @@
 
 namespace Nagi\FilamentMergeDuplicates;
 
-use Filament\Support\Assets\AlpineComponent;
 use Filament\Support\Assets\Asset;
 use Filament\Support\Assets\Css;
-use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentIcon;
 use Illuminate\Filesystem\Filesystem;
@@ -210,14 +208,16 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
     }
 
     /**
+     * The package ships one stylesheet. It does not import Filament's theme,
+     * because the panel already provides it; it adds only the focus,
+     * forced-colours and print robustness the pages rely on.
+     *
      * @return array<Asset>
      */
     protected function getAssets(): array
     {
         return [
-            // AlpineComponent::make('filament-merge-duplicates', __DIR__ . '/../resources/dist/components/filament-merge-duplicates.js'),
-            // Css::make('filament-merge-duplicates-styles', __DIR__ . '/../resources/dist/filament-merge-duplicates.css'),
-            // Js::make('filament-merge-duplicates-scripts', __DIR__ . '/../resources/dist/filament-merge-duplicates.js'),
+            Css::make('filament-merge-duplicates', __DIR__ . '/../resources/dist/filament-merge-duplicates.css'),
         ];
     }
 

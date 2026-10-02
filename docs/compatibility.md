@@ -124,8 +124,8 @@ Filament 5.9.0 / Livewire 4.4.7 / Laravel 12.69.3 / Testbench 10.12.0 —
 No compatibility adapter was needed for these surfaces. The page deliberately uses
 plain semantic markup and `wire:click` rather than Filament Blade components, for the
 same cross-major reason as the banner: the rendered output is then identical on both
-majors without a version check. Modal actions, render hooks and asset rendering are
-**not** verified here and remain open for the M5 gate.
+majors without a version check. Modal actions and render hooks are **not** verified
+here and remain open for the M5 gate.
 
 M5 slice 5 added the pair comparison, merge confirmation and audit pages on the same
 page/route/parameter surfaces, plus Livewire state updates that rebuild a server-side
@@ -135,11 +135,19 @@ majors and the suite passed on both lanes: 311 passed, 1 skipped, 982 assertions
 (Filament 4.14.0/Livewire 3.8.10 and Filament 5.9.0/Livewire 4.4.7). The new page tests
 are `tests/Feature/DuplicateMergePageTest.php`.
 
+M5 slice 6 registers one package stylesheet through `FilamentAsset::register` and
+asserts the file the asset points at exists (`tests/Feature/AssetRegistrationTest.php`).
+The stylesheet does not import Filament's theme - the panel already ships it - and adds
+only focus, forced-colours and print robustness. The UUID-keyed, non-soft-deleting
+fixture is driven through the same pages in
+`tests/Feature/FilamentTwoModelJourneyTest.php`, which also checks that record markup
+is escaped. Both lanes then ran 321 passed, 1 skipped, 1004 assertions each.
+
 ## Re-verification points
 
 | Milestone | Must re-verify |
 | --- | --- |
-| M5 | Page/route/navigation and Livewire state surfaces: verified on both majors (see above). Modal actions, render hooks, asset rendering and manual browser review are outstanding. |
+| M5 | Page/route/navigation and Livewire state surfaces: verified on both majors (see above). Asset registration verified; modal actions, render hooks and manual browser review are outstanding. |
 | M6 | A Filament 4 → 5 upgrade against existing package data, without a data reset |
 | M7 | Full matrix, resolved version range matching the published constraints |
 

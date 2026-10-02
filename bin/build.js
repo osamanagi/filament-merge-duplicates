@@ -50,3 +50,11 @@ compile({
 }).then(() => {
     console.log(`Build completed for filament-merge-duplicates.js`)
 })
+
+compile({
+    ...defaultOptions,
+    entryPoints: ['./resources/css/index.css'],
+    outfile: './resources/dist/filament-merge-duplicates.css',
+}).then(() => {
+    console.log(`Build completed for filament-merge-duplicates.css`)
+})
