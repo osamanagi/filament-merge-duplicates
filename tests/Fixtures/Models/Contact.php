@@ -17,7 +17,7 @@ class Contact extends Model
 
     protected $table = 'fixture_contacts';
 
-    public function notes(): HasMany
+    public function childNotes(): HasMany
     {
         return $this->hasMany(Note::class, 'contact_id');
     }

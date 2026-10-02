@@ -37,24 +37,24 @@ Last updated: M0 (compatibility spike and design freeze).
 
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
-| F01 | not started | — | |
-| F02 | not started | — | |
-| F03 | not started | — | |
-| F04 | not started | — | |
-| F05 | not started | — | |
-| F06 | not started | — | |
-| F07 | not started | — | |
+| F01 | passing | `tests/Feature/MergePlannerTest.php` | Equal values retain the survivor and are not reported as a difference; a blank survivor takes the source value; a blank source keeps the survivor value; both blank reports nothing to change. A blank string only counts as missing when the field opts in. |
+| F02 | passing | `tests/Feature/MergePlannerTest.php` | Two different non-blank values require an explicit choice, are reported as a blocker and are never resolved by last-write-wins. |
+| F03 | passing | `tests/Feature/MergePlannerTest.php` | Comparison is typed, never `empty()`: `false` and `0` are values, `5` and `'5'` differ, `'1.50'` and `'1.5'` differ, enums compare by case, and the same instant expressed in two offsets stays distinct. Asserted against `ValueCodec` directly, with the planner wiring covered by the difference tests. |
+| F04 | partial | `tests/Feature/MergePlannerTest.php` | The definition validator and the developer `MergeValidator` errors surface as field-level blockers, so a plan that would violate them is not confirmable. Database-level enforcement and rollback-free "no changes" proof arrive with execution in M4. |
+| F05 | passing | `tests/Feature/MergePlannerTest.php` | A unique field that cannot be transferred while the retired source keeps its value is blocked with that reason, and is not blocked when only one side holds a value. A source retired by soft delete blocks the merge outright. The "final constraint demonstrably valid" proof at write time belongs to M4. |
+| F06 | partial | `tests/Feature/MergePlannerTest.php`, `tests/Feature/DefinitionValidationTest.php` | Key, scope, timestamp, soft-delete, credential and relationship columns are rejected server-side by the validator, and a field that shadows a model method is rejected rather than silently read as a relation. Rejecting tampered selections submitted from a browser is M5. |
+| F07 | passing | `tests/Feature/MergePlannerTest.php` | An allowlisted field with an unsupported cast (array/JSON) is a configuration blocker, and an invalid definition now aborts planning before any field value is read, so the reported reason is the real cause. |
 
 ## Relationships and retirement (R)
 
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
-| R01 | not started | — | |
-| R02 | not started | — | |
+| R01 | partial | `tests/Feature/MergePlannerTest.php` | The plan counts the declared children a merge would move and describes the per-relation impact. The transfer itself is M4. |
+| R02 | partial | `tests/Feature/MergePlannerTest.php` | A transfer that would collide with an existing child on a per-parent composite unique constraint is blocked before anything is written. The whole-merge rollback proof is M4. |
 | R03 | not started | — | |
 | R04 | not started | — | |
-| R05 | not started | — | |
-| R06 | not started | — | |
+| R05 | partial | `tests/Feature/MergePlannerTest.php`, `tests/Feature/DefinitionValidationTest.php` | Relation types v1 cannot transfer (has-one, belongs-to-many, morph-many, media library) are rejected as configuration blockers instead of being guessed, and an unsupported type declared inline is rejected the same way. Cross-connection relations are not covered yet. |
+| R06 | passing | `tests/Feature/MergePlannerTest.php` | A transfer above the configured cap is blocked with the configured limit, and the boundary value is allowed. |
 | R07 | not started | — | |
 | R08 | not started | — | |
 
@@ -62,12 +62,12 @@ Last updated: M0 (compatibility spike and design freeze).
 
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
-| M01 | not started | — | |
-| M02 | not started | — | |
-| M03 | not started | — | |
-| M04 | not started | — | |
+| M01 | partial | `tests/Feature/MergePlannerTest.php` | A record merged into itself is refused, and a source already retired by an earlier merge is blocked. A survivor that is not part of the pair is refused. Missing/deleted-source handling and the cross-definition case arrive with execution in M4. |
+| M02 | partial | `tests/Feature/MergePlannerTest.php` | Switching the survivor rebuilds the plan instead of reusing the previous one, and an expired preview is rejected. Definition-revision staleness is checked by `revalidate()` but its end-to-end case is M4. |
+| M03 | passing | `tests/Feature/MergePlannerTest.php` | A merge-relevant field changed without touching `updated_at` is caught by the fingerprint and the plan is refused, while an untouched pair produces a stable fingerprint. |
+| M04 | passing | `tests/Feature/MergePlannerTest.php` | A relationship change made after the preview is detected and the plan is refused instead of being silently recomputed. |
 | M05 | not started | — | |
-| M06 | not started | — | |
+| M06 | partial | `tests/Feature/MergePlannerTest.php` | A preview replayed by a different actor, or in a different scope, is rejected. Replay of the same operation by the same actor is M4. |
 | M07 | not started | — | |
 | M08 | not started | — | |
 | M09 | not started | — | |

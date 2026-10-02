@@ -89,7 +89,8 @@ final class ConfigurableDefinition extends DuplicateDefinition
 
     public function authorizer(): MergeAuthorizer
     {
-        return new DenyAllMergeAuthorizer;
+        return $this->config['authorizer']
+            ?? new DenyAllMergeAuthorizer;
     }
 
     public function validator(): ?MergeValidator

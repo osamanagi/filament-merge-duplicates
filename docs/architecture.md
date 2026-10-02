@@ -28,7 +28,10 @@ outside the panel must not bypass authorization.
 | `src/Matching` | Rule implementations, stable rule IDs, reason generation |
 | `src/Normalization` | Built-in normalizers and their version identifiers |
 | `src/Data` | Key hashing, ID codecs, typed tuple encoding, field codecs |
-| `src/Services` | `DefinitionRegistry`, `ScanCoordinator`, `ScanChunkProcessor`, `SuggestionQuery`, `DismissalService`, `MergePlanner`, `MergeExecutor`, `AuditReader`, `RetirementResolver` |
+| `src/Scanning` | `ScopeManager`, `KeyBuilder`, `ScanChunkProcessor`, `ScanCoordinator`, `SuggestionQuery`, `DismissalService`, `ScanState` |
+| `src/Merging` | `MergePlanner`, `Fingerprinter`, `FieldDiffBuilder`, `SurvivorRecommender`, `RelationPlanBuilder`, `MergePlan`, `PreviewStore` |
+| `src/Retirement` | `RetirementResolver` and the retirement domain digest |
+| `src/Definitions` | `DefinitionRegistry` in addition to the base class and builders |
 | `src/Relations` | `HasManyTransfer` and the relation inventory validator |
 | `src/Authorization` | Default deny-by-default authorizer |
 | `src/Models` | Package Eloquent models over the six package tables |

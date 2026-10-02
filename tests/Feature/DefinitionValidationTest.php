@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Support\Facades\Schema;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
 use Nagi\FilamentMergeDuplicates\Authorization\DenyAllMergeAuthorizer;
@@ -65,11 +64,25 @@ function mergeReadyConfig(array $overrides = []): array
 |--------------------------------------------------------------------------
 | Definition validation
 |--------------------------------------------------------------------------
-|
-| Column-existence validation is implemented in DefinitionValidator but is not
-| asserted here: the schema bootstrap for the fixture models is only reliable
-| once the package models exist in M2.
 |*/
+
+it('rejects a matching rule that reads a column which does not exist', function () {
+    $report = validateDefinition([
+        'matchingRules' => [ExactRule::make('ghost')->fields(['ghost_column'])],
+    ]);
+
+    expect($report->detectionCapable)->toBeFalse()
+        ->and(blockerMessages($report))->toContain('ghost_column');
+});
+
+it('rejects a merge field that does not exist as a column or accessor', function () {
+    $report = validateDefinition([
+        'fields' => [MergeField::make('ghost_column')],
+    ]);
+
+    expect($report->mergeCapable)->toBeFalse()
+        ->and(blockerMessages($report))->toContain('ghost_column');
+});
 
 it('accepts a definition that satisfies every merge requirement', function () {
     $report = (new DefinitionValidator)->validate(new ContactDuplicates);
@@ -127,7 +140,7 @@ it('rejects an allowlisted primary key, timestamp, soft-delete or scope key', fu
 
 it('rejects an allowlisted relationship foreign key', function () {
     $report = validateDefinition([
-        'relations' => [new CompleteHasMany('notes')],
+        'relations' => [new CompleteHasMany('childNotes')],
         'fields' => [MergeField::make('contact_id')],
     ]);
 
@@ -174,7 +187,7 @@ it('rejects a model class that does not exist or is not eloquent', function (str
 
 it('blocks an unsupported relation type instead of guessing a strategy', function (RelationType $type) {
     $report = validateDefinition(mergeReadyConfig([
-        'relations' => [new CompleteHasMany('notes', type: $type)],
+        'relations' => [new CompleteHasMany('childNotes', type: $type)],
     ]));
 
     expect($report->detectionCapable)->toBeTrue()
@@ -189,7 +202,7 @@ it('blocks an unsupported relation type instead of guessing a strategy', functio
 
 it('blocks a filtered relation that cannot prove complete coverage', function () {
     $report = validateDefinition(mergeReadyConfig([
-        'relations' => [new CompleteHasMany('notes', complete: false)],
+        'relations' => [new CompleteHasMany('childNotes', complete: false)],
     ]));
 
     expect($report->mergeCapable)->toBeFalse()

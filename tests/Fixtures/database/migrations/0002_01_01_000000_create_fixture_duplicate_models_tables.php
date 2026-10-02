@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('tenant_id');
             $table->string('reference')->nullable();
+            $table->string('external_ref')->nullable()->unique();
             $table->string('email')->nullable();
             $table->string('display_name')->nullable();
             $table->text('notes')->nullable();
@@ -24,6 +25,10 @@ return new class extends Migration
             $table->unsignedBigInteger('contact_id')->nullable();
             $table->string('body')->nullable();
             $table->timestamps();
+
+            // A composite unique index that two transferred children can
+            // collide on, which the planner must block rather than resolve.
+            $table->unique(['contact_id', 'body']);
         });
 
         Schema::create('fixture_inventory_items', function (Blueprint $table) {
