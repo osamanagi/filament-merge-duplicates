@@ -6,6 +6,7 @@ use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
+use Nagi\FilamentMergeDuplicates\Jobs\ProcessScanChunk;
 use Nagi\FilamentMergeDuplicates\Models\ScanRecord;
 
 /**
@@ -42,6 +43,15 @@ final class ScanStarter
             throw new ForbiddenOperation('The acting user may not scan for duplicates for this definition.');
         }
 
-        return $this->coordinator->start($definition, $context);
+        $scan = $this->coordinator->start($definition, $context);
+
+        // Reserving the scope is not scanning it: the queued chunk job is the
+        // work a worker actually runs. Dispatching it here is what keeps a
+        // page-driven scan from sitting at "queued" forever because the only
+        // other dispatcher is the CLI. The context travels as primitives and the
+        // job re-establishes it, so nothing session-scoped is serialised.
+        ProcessScanChunk::dispatch($definition->id(), $context->toStorableArray(), $scan->id);
+
+        return $scan;
     }
 }

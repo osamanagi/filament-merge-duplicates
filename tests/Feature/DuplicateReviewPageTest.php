@@ -3,6 +3,7 @@
 namespace Nagi\FilamentMergeDuplicates\Tests\Feature;
 
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
@@ -13,6 +14,7 @@ use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
 use Nagi\FilamentMergeDuplicates\Filament\Concerns\HasDuplicateSuggestions;
 use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateReviewPage;
 use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesPlugin;
+use Nagi\FilamentMergeDuplicates\Jobs\ProcessScanChunk;
 use Nagi\FilamentMergeDuplicates\Models\ScanRecord;
 use Nagi\FilamentMergeDuplicates\Models\ScopeRecord;
 use Nagi\FilamentMergeDuplicates\Scanning\KeyBuilder;
@@ -30,7 +32,13 @@ use function Pest\Livewire\livewire;
  * The review page is the surface behind the banner. These tests pin the states a
  * reviewer meets, the staleness the list must not hide, and the ways a forged
  * request could try to widen what the page shows.
+ *
+ * The queue is faked so the page's scan control is tested for what it queues,
+ * rather than by draining the scan inside the request.
  */
+beforeEach(function () {
+    Queue::fake();
+});
 
 /**
  * @param  list<string>  $abilities
@@ -348,6 +356,8 @@ it('starts a scan for an actor who may scan', function () {
         ->assertOk();
 
     expect(ScanRecord::on($context->connection)->where('scope_id', reviewPageScope($context)->id)->count())->toBe(1);
+
+    Queue::assertPushed(ProcessScanChunk::class);
 });
 
 it('refuses a forged scan call from an actor who may not scan', function () {

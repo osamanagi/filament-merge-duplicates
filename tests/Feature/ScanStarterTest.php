@@ -2,11 +2,13 @@
 
 namespace Nagi\FilamentMergeDuplicates\Tests\Feature;
 
+use Illuminate\Support\Facades\Queue;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Exceptions\DomainConflict;
 use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
+use Nagi\FilamentMergeDuplicates\Jobs\ProcessScanChunk;
 use Nagi\FilamentMergeDuplicates\Models\ScanRecord;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanCoordinator;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanStarter;
@@ -20,7 +22,15 @@ use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\PanelContextResolver;
  * The scan control on a page has to be as safe as the command line: an actor who
  * may not scan must not be able to start one by reaching the service that a page
  * happens to call.
+ *
+ * The queue is faked because these tests are about who may start a scan and how
+ * a duplicate start is reported, not about the worker that drains the chunks.
+ * That the queued work is real, and not just a row in `scans`, is asserted
+ * explicitly instead.
  */
+beforeEach(function () {
+    Queue::fake();
+});
 function scanDefinition(array $abilities = ['scan']): ConfigurableDefinition
 {
     return new ConfigurableDefinition([
@@ -57,6 +67,12 @@ it('starts a queued scan for an actor who may scan', function () {
     expect($scan->state)->toBe(ScanState::Queued)
         ->and($scan->generation_id)->not->toBe('')
         ->and(ScanRecord::on($context->connection)->where('scope_id', $scan->scope_id)->count())->toBe(1);
+
+    // A scan that nothing drains would leave the page claiming to scan forever.
+    Queue::assertPushed(
+        ProcessScanChunk::class,
+        fn (ProcessScanChunk $job): bool => $job->definitionId === $definition->id() && $job->scanId === $scan->id,
+    );
 });
 
 it('refuses to start a scan for an actor without the scan ability', function () {
@@ -68,8 +84,10 @@ it('refuses to start a scan for an actor without the scan ability', function () 
     expect(fn () => app(ScanStarter::class)->start($definition, $context))
         ->toThrow(ForbiddenOperation::class);
 
-    // Nothing was queued by the refused attempt.
+    // The refused attempt queued neither a scan row nor any work.
     expect(ScanRecord::on($context->connection)->count())->toBe(0);
+
+    Queue::assertNothingPushed();
 });
 
 it('reports a second scan for the same scope as a conflict rather than a denial', function () {
