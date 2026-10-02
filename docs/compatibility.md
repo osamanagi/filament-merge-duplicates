@@ -1,0 +1,116 @@
+# Filament compatibility
+
+Status: M0 evidence. One package release line supports Filament 4 and Filament 5
+simultaneously via `"filament/filament": "^4.0 || ^5.0"`.
+
+## Verified lanes
+
+All four lanes ran the identical test suite in an isolated checkout. Versions are
+the ones actually resolved and executed, recorded from `composer.lock`.
+
+| Lane | Filament | Livewire | Laravel | Testbench | Result |
+| --- | --- | --- | --- | --- | --- |
+| F4 minimum | 4.12.6 | 3.8.3 | 12.69.0 | 10.0.0 | 6 passed |
+| F4 current | 4.14.0 | 3.8.10 | 12.69.3 | 10.12.0 | 6 passed |
+| F5 minimum | 5.7.6 | 4.3.4 | 12.69.0 | 10.2.0 | 6 passed |
+| F5 current | 5.9.0 | 4.4.7 | 12.69.3 | 10.12.0 | 6 passed |
+
+Local PHP for these runs was 8.4.22. The published minimum PHP 8.2 is exercised in
+CI only; it is not claimed as locally verified.
+
+### PHP baseline
+
+PHP 8.2 is supported, but it is covered differently per major:
+
+| Combination | Installable | Test suite executed in CI |
+| --- | --- | --- |
+| Filament 4 on PHP 8.2 | Yes | Yes |
+| Filament 4 on PHP 8.3 / 8.4 | Yes | Yes |
+| Filament 5 on PHP 8.2 | Yes | **No** — dev tooling needs PHP 8.3+ |
+| Filament 5 on PHP 8.3 / 8.4 | Yes | Yes |
+
+Filament 5 on PHP 8.2 installs. A throwaway consumer project requiring the package plus
+`filament/filament:^5.0` resolves with `php: 8.2` as platform and installs Filament 5.9.0,
+Livewire 4.4.7 and Laravel 12.69.3. What needs PHP 8.3+ is the package's test tooling:
+Pest 4, PHPUnit 12, Pint and `brianium/paratest`, reached through
+Filament 5 → Livewire 4 → `pest-plugin-livewire` 4 → Pest 4. There is no Pest 3 line that
+supports Livewire 4.
+
+So `bin/resolve-lane.sh` proves installability on the minimum PHP for both majors as a
+required CI job, and the Filament 5 lanes execute on 8.3 and 8.4. See
+[ADR 0008](adr/0008-php-baseline-and-tooling.md). "Installable" and "behaviourally
+verified" are not the same claim, and the support matrix says which is which.
+
+For comparison, this machine previously resolved `laravel/framework` 13.34.0 via
+Testbench 11. That pairing is outside the published support promise and is no
+longer used: the development stack is pinned to Testbench 10 (Laravel 12).
+
+## Adapter decisions
+
+No compatibility adapter is required for the surfaces M0 must prove. The following
+were verified to exist with identical signatures on both majors and are used
+directly:
+
+| Surface | Verified location |
+| --- | --- |
+| Panel plugin contract | `Filament\Contracts\Plugin`, `Filament\Panel` |
+| Panel provider | `Filament\PanelProvider`, `Panel::plugin()`, `Panel::getPlugin()` |
+| Panel manager | `Filament\Facades\Filament`, `Filament\FilamentManager::setCurrentPanel()`, `filament()` helper |
+| Action host contract | `Filament\Actions\Contracts\HasActions` |
+| Action host trait | `Filament\Actions\Concerns\InteractsWithActions` |
+| Schema host | `Filament\Schemas\Contracts\HasSchemas`, `InteractsWithSchemas` |
+| Action testing API | `Filament\Actions\Testing\TestsActions` (`assertActionExists`, `assertActionVisible`, `mountAction`, `assertActionMounted`, `assertMountedActionModalSee`) |
+| Action rendering | `Action::toHtml()`, `filament-actions::modals` Blade component |
+
+Rules that keep this true:
+
+- Prefer APIs common to 4 and 5. Do not sprinkle version checks through services.
+- If an unavoidable difference appears, isolate it behind a small compatibility
+  adapter that preserves identical data and permission behavior. Never fork
+  domain, persistence or merge logic.
+- Never add a Filament-3 API, and never assume a 5-only API works on 4.
+- The package does not declare Livewire directly; Filament constrains it. If a
+  direct declaration ever becomes necessary it must be a validated union, never a
+  v4-only pin.
+- The installed major is validated server-side from Composer metadata and an
+  unsupported major is rejected with a clear message.
+
+## Local lane testing
+
+The checked-in lockfile stays on the current Filament major. Other lanes run in an
+isolated copy so the lockfile is never mutated:
+
+```bash
+bin/lane-test.sh '^4.0'                  # Filament 4, current set
+bin/lane-test.sh '^4.0' --prefer-lowest  # Filament 4, lowest permitted set
+bin/lane-test.sh '^5.0'                  # Filament 5, current set
+bin/lane-test.sh '^5.0' --prefer-lowest  # Filament 5, lowest permitted set
+```
+
+These four commands are the same lanes CI runs. Published constraints are verified
+separately, including on PHP versions the test tooling cannot run on:
+
+```bash
+bin/resolve-lane.sh '^4.0'         # resolve as the local PHP
+bin/resolve-lane.sh '^5.0' 8.2.0   # resolve as if the host ran PHP 8.2
+```
+
+## Re-verification points
+
+| Milestone | Must re-verify |
+| --- | --- |
+| M5 | Page/action/hooks/asset APIs on both majors, Livewire state updates, modal actions |
+| M6 | A Filament 4 → 5 upgrade against existing package data, without a data reset |
+| M7 | Full matrix, resolved version range matching the published constraints |
+
+## Known M0 limitations
+
+- `--prefer-lowest` resolves 4.12.6 / 5.7.6 rather than 4.0.0 / 5.0.0, because
+  Filament's own sub-package minimums dominate. The lowest genuinely resolvable
+  set is what is tested.
+- PHP 8.2 is not available locally, so the PHP minimum lanes are CI-only.
+- Filament 5 behaviour is not executed on PHP 8.2, only proven installable there
+  (ADR 0008).
+- PHP 8.4 emits a `symfony/translation` implicit-nullable deprecation on the
+  lowest lanes. It is a vendor deprecation, not a package failure; it is recorded
+  rather than suppressed.

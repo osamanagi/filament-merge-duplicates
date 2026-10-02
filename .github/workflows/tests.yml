@@ -2,6 +2,8 @@ name: tests
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 permissions:
@@ -12,67 +14,234 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  run-tests:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: true
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        php: [8.4, 8.3, 8.2]
-        laravel: [13.*, 12.*, 11.*]
-        stability: [prefer-lowest, prefer-stable]
-        include:
-          - laravel: 13.*
-            testbench: 11.*
-            carbon: 3.*
-            collision: 8.*
-          - laravel: 12.*
-            testbench: 10.*
-            carbon: 3.*
-            collision: 8.*
-          - laravel: 11.*
-            testbench: 9.*
-            carbon: 3.*
-            collision: 8.*
-        exclude:
-          - laravel: 13.*
-            php: 8.2
+  lint:
+    name: Pint and PHPStan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, intl, fileinfo
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Check code style
+        run: vendor/bin/pint --test
+
+      - name: Static analysis
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+  tests:
+    name: ${{ matrix.lane }} - PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: merge_duplicates
+          MYSQL_USER: merge
+          MYSQL_PASSWORD: secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -psecret"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: merge_duplicates
+          POSTGRES_USER: merge
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U merge -d merge_duplicates"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+        lane: [f4-lowest, f4-current, f5-lowest, f5-current]
+        include:
+          - lane: f4-lowest
+            constraint: '^4.0'
+            flags: '--prefer-lowest'
+          - lane: f4-current
+            constraint: '^4.0'
+            flags: ''
+          - lane: f5-lowest
+            constraint: '^5.0'
+            flags: '--prefer-lowest'
+          - lane: f5-current
+            constraint: '^5.0'
+            flags: ''
+        exclude:
+          # Filament 5 itself installs on PHP 8.2 (proven by the resolve job),
+          # but this package's dev tooling - Pest 4, PHPUnit 12, Pint - requires
+          # PHP 8.3+, so the Filament 5 test suite cannot execute on PHP 8.2.
+          # PHP 8.2 is covered by the Filament 4 lanes and by the resolve job.
+          - php: '8.2'
+            lane: f5-lowest
+          - php: '8.2'
+            lane: f5-current
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Cache Composer dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
-          path: ~/.composer/cache/files
-          key: composer-${{ matrix.os }}-${{ matrix.php }}-${{ matrix.laravel }}-${{ matrix.stability }}-${{ hashFiles('composer.json') }}
-          restore-keys: |
-            composer-${{ matrix.os }}-${{ matrix.php }}-${{ matrix.laravel }}-
-            composer-${{ matrix.os }}-${{ matrix.php }}-
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, intl, fileinfo
+          coverage: none
+
+      - name: Pin the Filament major under test
+        run: composer require --no-interaction --no-update "filament/filament:${{ matrix.constraint }}"
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress ${{ matrix.flags }}
+
+      - name: Record resolved versions
+        run: |
+          php -r '
+              $lock = json_decode(file_get_contents("composer.lock"), true);
+              $packages = array_merge($lock["packages"], $lock["packages-dev"]);
+              $wanted = ["filament/filament", "laravel/framework", "livewire/livewire", "orchestra/testbench", "pestphp/pest"];
+              $map = [];
+              foreach ($packages as $package) { $map[$package["name"]] = $package["version"]; }
+              foreach ($wanted as $name) { printf("%-24s %s\n", $name, $map[$name] ?? "ABSENT"); }
+          '
+
+      - name: Execute tests
+        # Coverage is measured by the dedicated coverage job, which is the only
+        # job that provisions a coverage driver. Pest's --ci flag requests
+        # coverage, so the lanes must not use it.
+        run: vendor/bin/pest --no-coverage --colors=never
+
+  resolve:
+    name: Resolve ${{ matrix.constraint }} on PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+
+    # Proves the published "require" constraints install for both Filament
+    # majors on the minimum supported PHP and on current PHP, independently of
+    # whether the test tooling can execute there. This is the C03 evidence for
+    # the PHP lower bound.
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+        constraint: ['^4.0', '^5.0']
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: ${{ matrix.php }}
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
+          extensions: dom, curl, libxml, mbstring, zip, bcmath, intl, fileinfo
           coverage: none
 
-      - name: Setup problem matchers
-        run: |
-          echo "::add-matcher::${{ runner.tool_cache }}/php.json"
-          echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
+      - name: Resolve published constraints
+        run: bin/resolve-lane.sh '${{ matrix.constraint }}'
+
+  coverage:
+    name: Coverage draft (${{ matrix.lane }})
+    runs-on: ubuntu-latest
+
+    # The 100% src/ line coverage gate is a release requirement at M7. Until then
+    # this job measures and reports so regressions stay visible without blocking
+    # every milestone PR. The command still carries --min=100 so the threshold is
+    # explicit and cannot be quietly weakened; this job becomes blocking at M7.
+    continue-on-error: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [filament-4, filament-5]
+        include:
+          - lane: filament-4
+            constraint: '^4.0'
+          - lane: filament-5
+            constraint: '^5.0'
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: merge_duplicates
+          MYSQL_USER: merge
+          MYSQL_PASSWORD: secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -psecret"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: merge_duplicates
+          POSTGRES_USER: merge
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U merge -d merge_duplicates"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, intl, fileinfo
+          coverage: pcov
+
+      - name: Pin the Filament major under test
+        run: composer require --no-interaction --no-update "filament/filament:${{ matrix.constraint }}"
 
       - name: Install dependencies
-        run: |
-          composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" "nesbot/carbon:${{ matrix.carbon }}" --no-interaction --no-update
-          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+        run: composer update --prefer-dist --no-interaction --no-progress
 
-      - name: List installed dependencies
-        run: composer show -D
+      - name: Measure coverage
+        run: vendor/bin/pest --coverage --min=100 --colors=never
 
-      - name: Execute tests
-        run: vendor/bin/pest --ci
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-${{ matrix.lane }}
+          path: |
+            build/coverage
+            build/coverage.txt
+            build/logs/clover.xml
+          if-no-files-found: warn

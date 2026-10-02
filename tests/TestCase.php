@@ -16,10 +16,12 @@ use Filament\Widgets\WidgetsServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\LivewireServiceProvider;
+use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesServiceProvider;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\User;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Panel\TestPanelProvider;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\TestCase as Orchestra;
 use RyanChandler\BladeCaptureDirective\BladeCaptureDirectiveServiceProvider;
-use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesServiceProvider;
 
 class TestCase extends Orchestra
 {
@@ -33,6 +35,8 @@ class TestCase extends Orchestra
         Factory::guessFactoryNamesUsing(
             fn (string $modelName) => 'Nagi\\FilamentMergeDuplicates\\Database\\Factories\\' . class_basename($modelName) . 'Factory'
         );
+
+        $this->app['view']->addNamespace('duplicate-tests', __DIR__ . '/Fixtures/views');
     }
 
     protected function getPackageProviders($app)
@@ -52,6 +56,7 @@ class TestCase extends Orchestra
             TablesServiceProvider::class,
             WidgetsServiceProvider::class,
             FilamentMergeDuplicatesServiceProvider::class,
+            TestPanelProvider::class,
         ];
 
         sort($providers);
@@ -62,10 +67,13 @@ class TestCase extends Orchestra
     public function getEnvironmentSetUp($app): void
     {
         $app['config']->set('database.default', 'testing');
+        $app['config']->set('auth.providers.users.model', User::class);
+        $app['config']->set('app.key', 'base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=');
     }
 
     protected function defineDatabaseMigrations(): void
     {
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+        $this->loadMigrationsFrom(__DIR__ . '/Fixtures/database/migrations');
     }
 }

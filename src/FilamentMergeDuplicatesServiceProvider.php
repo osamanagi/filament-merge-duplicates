@@ -10,11 +10,11 @@ use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentIcon;
 use Illuminate\Filesystem\Filesystem;
 use Livewire\Features\SupportTesting\Testable;
+use Nagi\FilamentMergeDuplicates\Commands\FilamentMergeDuplicatesCommand;
+use Nagi\FilamentMergeDuplicates\Testing\TestsFilamentMergeDuplicates;
 use Spatie\LaravelPackageTools\Commands\InstallCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use Nagi\FilamentMergeDuplicates\Commands\FilamentMergeDuplicatesCommand;
-use Nagi\FilamentMergeDuplicates\Testing\TestsFilamentMergeDuplicates;
 
 class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
 {
