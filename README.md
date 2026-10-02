@@ -1,17 +1,17 @@
 # Detect, review, and safely merge duplicate records in Filament apps
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/osamanagi/filament-merge-duplicates.svg?style=flat-square)](https://packagist.org/packages/osamanagi/filament-merge-duplicates)
-[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/osamanagi/filament-merge-duplicates/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/osamanagi/filament-merge-duplicates/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/osamanagi/filament-merge-duplicates/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/osamanagi/filament-merge-duplicates/actions?query=workflow%3A"Fix+PHP+code+styling"+branch%3Amain)
+[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/osamanagi/filament-merge-duplicates/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/osamanagi/filament-merge-duplicates/actions/workflows/tests.yml)
+[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/osamanagi/filament-merge-duplicates/fix-code-style.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/osamanagi/filament-merge-duplicates/actions/workflows/fix-code-style.yml)
 [![Total Downloads](https://img.shields.io/packagist/dt/osamanagi/filament-merge-duplicates.svg?style=flat-square)](https://packagist.org/packages/osamanagi/filament-merge-duplicates)
 
 
 
 > [!WARNING]
-> **v1.0 is in development.** This repository is at milestone M0 (compatibility
-> spike and design freeze). The developer API, migrations and UI described in the
-> implementation plan are not implemented yet. Nothing here is installable for
-> production use until the M7 release gate passes.
+> **v1.0 is in development.** The detection, merge and Filament surfaces described
+> below are implemented and pass on both Filament majors, but the package is not
+> published on Packagist and the developer API may still change before the M7
+> release gate. Do not use it in production yet.
 
 Detect, explain, review and deliberately merge duplicate records in Filament
 apps, without losing declared relationships. The package is generic: developers
@@ -19,7 +19,7 @@ register an independent definition per Eloquent model exposed through a Filament
 resource, supplying matching rules, a field allowlist, scope, authorization and
 relationship strategies. No model, column or relationship is hardcoded.
 
-Proposed behaviour, once v1.0 lands:
+What the package does:
 
 - Exact normalized single-field and composite matching, with an explanation for
   every suggested match. No fuzzy or AI scoring, and no probabilistic match
@@ -46,9 +46,20 @@ composer require osamanagi/filament-merge-duplicates
 ```
 
 > [!IMPORTANT]
-> The package is not published yet, so the command above fails until the v1.0 release. To work from a checkout, use the lane commands under Testing below.
+> The package is not published yet, so the command above fails until the v1.0
+> release. To work from a checkout, add a path repository to the consuming app
+> instead:
 >
-> If you have not set up a custom theme and are using Filament Panels, follow the instructions for your installed major first: [Filament 4.x](https://filamentphp.com/docs/4.x/styling/overview#creating-a-custom-theme) or [Filament 5.x](https://filamentphp.com/docs/5.x/styling/overview#creating-a-custom-theme).
+> ```json
+> "repositories": [
+>     { "type": "path", "url": "../filament-merge-duplicates" }
+> ]
+> ```
+
+If you have not set up a custom theme and are using Filament Panels, follow the
+instructions for your installed major first:
+[Filament 4.x](https://filamentphp.com/docs/4.x/styling/overview#creating-a-custom-theme)
+or [Filament 5.x](https://filamentphp.com/docs/5.x/styling/overview#creating-a-custom-theme).
 
 After setting up a custom theme add the plugin's views to your theme css file or your app's css file if using the standalone packages.
 
@@ -56,31 +67,316 @@ After setting up a custom theme add the plugin's views to your theme css file or
 @source '../../../../vendor/osamanagi/filament-merge-duplicates/resources/**/*.blade.php';
 ```
 
-You can publish and run the migrations with:
+Publish the config file and the migrations, then migrate:
 
 ```bash
+php artisan vendor:publish --tag="filament-merge-duplicates-config"
 php artisan vendor:publish --tag="filament-merge-duplicates-migrations"
 php artisan migrate
 ```
 
-You can publish the config file with:
+The package registers one stylesheet. If your app serves Filament's assets from
+`public/`, publish them as usual so the stylesheet is not a 404:
 
 ```bash
-php artisan vendor:publish --tag="filament-merge-duplicates-config"
+php artisan filament:assets
 ```
 
-Optionally, you can publish the views using
+The translations and views are publishable under
+`filament-merge-duplicates-translations` and `filament-merge-duplicates-views`,
+but neither has to be published: the package ships working defaults.
 
-```bash
-php artisan vendor:publish --tag="filament-merge-duplicates-views"
+## Configuration
+
+`config/merge-duplicates.php` holds every knob. The keys that are consumed today:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `definitions` | `[]` | Definition classes the registry resolves. A queued worker resolves them from here, so this is the whole list, not a per-panel list. |
+| `connection` | `null` | Connection the package tables live on. `null` means the merged model's own connection, which must be the same one. |
+| `secret` | `null` | HMAC secret for matching keys. `null` falls back to `app.key`. |
+| `key_version` | `'v1'` | Part of the key digest. Bump it to invalidate every published generation and dismissal on purpose. |
+| `preview.ttl_minutes` | `15` | How long a merge preview stays confirmable. An expired preview has to be rebuilt. |
+| `scan.chunk_size` | `1000` | Records per chunk job. Keyset paging, never offsets. |
+| `relations.max_children_per_merge` | `500` | Above this a merge is blocked with an explanation instead of truncated. |
+| `supported_merge_drivers` | `['mysql', 'pgsql']` | Merge execution refuses a driver that cannot give the row locks the transaction needs. |
+| `forbidden_field_names` | see file | Names that may never be part of a scalar merge, on top of the model-derived checks. |
+
+Two things to know before you configure anything:
+
+- Matching keys are stored as HMAC digests, never as raw values. Rotating the
+  secret or `app.key` invalidates published generations and dismissals, so a
+  rotation needs a rescan. Matching keys are also not portable between
+  applications.
+- `retention.previews_days` and `retention.scans_days` exist but are not consumed
+  yet: pruning package rows is not implemented. Previews do expire by TTL when
+  they are read, and the merge ledger is never pruned. See
+  [docs/support-matrix.md](docs/support-matrix.md) for the exact boundary.
+
+## Walkthrough: two unrelated resources in one panel
+
+The steps below are the whole integration. Both demo applications in
+[docs/demo-walkthrough.md](docs/demo-walkthrough.md) follow exactly this shape
+(same panel, two unrelated models, different rules and fields).
+
+### 1. Write a definition per model
+
+One class per model, resolved from the container. It declares what may match, what
+may be merged, who may do it and how a source is retired.
+
+```php
+<?php
+
+namespace App\MergeDuplicates;
+
+use App\Models\Shop\Customer;
+use Nagi\FilamentMergeDuplicates\Authorization\Ability;
+use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
+use Nagi\FilamentMergeDuplicates\Contracts\ContextResolver;
+use Nagi\FilamentMergeDuplicates\Contracts\MergeAuthorizer;
+use Nagi\FilamentMergeDuplicates\Contracts\MergeValidator;
+use Nagi\FilamentMergeDuplicates\Contracts\RetirementStrategy;
+use Nagi\FilamentMergeDuplicates\Contracts\ScopedRecordQuery;
+use Nagi\FilamentMergeDuplicates\Contracts\WriterGuard;
+use Nagi\FilamentMergeDuplicates\Definitions\DuplicateDefinition;
+use Nagi\FilamentMergeDuplicates\Definitions\MergeField;
+use Nagi\FilamentMergeDuplicates\Matching\ExactRule;
+use Nagi\FilamentMergeDuplicates\Normalization\TrimmedTextNormalizer;
+use Nagi\FilamentMergeDuplicates\Relations\LockingWriterGuard;
+
+final class CustomerDuplicates extends DuplicateDefinition
+{
+    public function id(): string
+    {
+        return 'shop-customers';
+    }
+
+    public function model(): string
+    {
+        return Customer::class;
+    }
+
+    public function label(): string
+    {
+        return 'Customer';
+    }
+
+    public function ownershipDomain(): string
+    {
+        return 'shop';
+    }
+
+    public function recordTitleAttribute(): ?string
+    {
+        return 'name';
+    }
+
+    /**
+     * @return list<ExactRule>
+     */
+    public function matchingRules(): array
+    {
+        return [
+            ExactRule::make('name')
+                ->fields(['name'])
+                ->normalizeWith(TrimmedTextNormalizer::class, lowercase: true)
+                ->describedAs('Same name'),
+        ];
+    }
+
+    /**
+     * @return list<MergeField>
+     */
+    public function fields(): array
+    {
+        return [
+            MergeField::make('name')->label('Name'),
+            MergeField::make('phone')->label('Phone'),
+        ];
+    }
+
+    public function acknowledgesCompleteReferenceInventory(): bool
+    {
+        return true;
+    }
+
+    public function contextResolver(): ContextResolver
+    {
+        return new PanelActorResolver;
+    }
+
+    public function scopedRecordQuery(): ScopedRecordQuery
+    {
+        return new UnscopedRecordQuery;
+    }
+
+    public function authorizer(): MergeAuthorizer
+    {
+        return new AbilityMapAuthorizer([
+            Ability::Review,
+            Ability::Dismiss,
+            Ability::Scan,
+            Ability::Merge,
+            Ability::ViewAudit,
+        ]);
+    }
+
+    public function validator(): ?MergeValidator
+    {
+        return new PassThroughValidator;
+    }
+
+    public function retirementStrategy(): ?RetirementStrategy
+    {
+        return new SoftDeleteRetirement;
+    }
+
+    public function writerGuard(): ?WriterGuard
+    {
+        return app(LockingWriterGuard::class);
+    }
+}
 ```
 
-This is the contents of the published config file:
+`PanelActorResolver`, `UnscopedRecordQuery`, `PassThroughValidator` and
+`SoftDeleteRetirement` are host classes; [docs/api-reference.md](docs/api-reference.md)
+lists the contracts and what each implementation has to guarantee. A definition is
+rejected with a blocker when it cannot merge safely — no soft deletes on the model,
+no explicit retirement strategy, no validator, no writer guard, or an unacknowledged
+reference inventory.
+
+### 2. Register the definitions and enable the panel
+
+Add your definitions to the published config file:
 
 ```php
 return [
+    'definitions' => [
+        App\MergeDuplicates\CustomerDuplicates::class,
+        App\MergeDuplicates\BlogPostDuplicates::class,
+    ],
 ];
 ```
+
+Enable the panel, keeping the rest of the provider as it is:
+
+```php
+<?php
+
+namespace App\Providers\Filament;
+
+use Filament\Panel;
+use Filament\PanelProvider;
+use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesPlugin;
+
+class AdminPanelProvider extends PanelProvider
+{
+    public function panel(Panel $panel): Panel
+    {
+        return $panel
+            // ... the configuration the panel already had
+            ->plugin(
+                FilamentMergeDuplicatesPlugin::make()
+                    ->definitions(['shop-customers', 'blog-posts'])
+            );
+    }
+}
+```
+
+The plugin registers the review, comparison and audit pages on that panel. A
+definition that is registered but not listed on the panel is not reachable from
+it, which is what keeps one panel's definitions out of another's URLs.
+
+### 3. Scan
+
+Either let a reviewer start a scan from the review page, or run it from the CLI:
+
+```bash
+php artisan filament-merge-duplicates:scan shop-customers --actor=user:1 --panel=admin
+php artisan filament-merge-duplicates:scan shop-customers --actor=user:1 --panel=admin --sync
+```
+
+The panel and the actor are part of the scope identity, so a scan started under a
+different panel or actor publishes a generation that this panel will not show. Use
+the same values the UI uses.
+
+The default (non-`--sync`) form queues the first chunk job, so a worker has to be
+running:
+
+```bash
+php artisan queue:work
+```
+
+The job processes one chunk, re-dispatches itself while work remains and publishes
+the generation only when every chunk has succeeded. A failed scan leaves the
+previous generation published and stores a sanitized reason code, never SQL or
+values.
+
+### 4. Review, compare, merge, audit
+
+| Page | URL | What it does |
+| --- | --- | --- |
+| Review | `merge-duplicates/{definition}` | Buckets the acting user may see, with staleness and scan state |
+| Compare | `merge-duplicates/{definition}/compare/{first}/{second}` | Per-field choice, blockers, retirement warning, confirm |
+| Audit | `merge-duplicates/{definition}/audit/{operation}` | One merge operation, including the choices that were recorded |
+
+The pages build their own URLs through
+`DuplicateReviewPage::urlForDefinition()`, `DuplicateMergePage::urlForPair()` and
+`DuplicateAuditPage::urlForOperation()`, so a host never has to reproduce a route
+name.
+
+### 5. Optional: put the suggestion count on the resource list page
+
+`HasDuplicateSuggestions` gives a resource page a banner for one definition. It
+delegates every check to the same services the pages use, so a page cannot widen
+what an actor sees:
+
+```php
+<?php
+
+namespace App\Filament\Resources\Shop\Customers\Pages;
+
+use App\Filament\Resources\Shop\CustomerResource;
+use Filament\Resources\Pages\ListRecords;
+use Nagi\FilamentMergeDuplicates\Filament\Concerns\HasDuplicateSuggestions;
+
+class ListCustomers extends ListRecords
+{
+    use HasDuplicateSuggestions;
+
+    protected static string $resource = CustomerResource::class;
+
+    public function duplicateDefinitionId(): string
+    {
+        return 'shop-customers';
+    }
+}
+```
+
+`duplicateBannerView()` returns a rendered banner for the definition — or `null`
+for an actor without the review ability and for a guest, so a panel never breaks
+for someone who is not allowed to see a count.
+
+## Authorization
+
+Every operation is authorized separately, and the defaults deny:
+
+| Ability | Gates |
+| --- | --- |
+| `review` | Seeing the review page, the group list and the banner |
+| `dismiss` | Marking a pair as not duplicates |
+| `scan` | Starting a scan, from the page or the CLI |
+| `merge` | Building a preview and confirming a merge |
+| `view-audit` | Reading a merge history entry |
+
+The definition's `authorizer()` answers them. The pages, the banner and the CLI go
+through services that check the ability themselves, so a forgotten check at a call
+site cannot widen access. A suggestion never authorizes a merge: review and merge
+are different abilities.
+
+Depth on every contract, DTO, event and error code:
+[docs/api-reference.md](docs/api-reference.md) and [docs/errors.md](docs/errors.md).
+
 
 ## Requirements
 
@@ -98,21 +394,8 @@ behaviour is verified on 8.3 and 8.4. See
 [docs/compatibility.md](docs/compatibility.md) and [ADR 0008](docs/adr/0008-php-baseline-and-tooling.md).
 
 SQLite can run detection and UI tests, but merge execution refuses it because it
-cannot provide equivalent row-lock guarantees.
-
-## Usage
-
-The developer API is not implemented yet and is defined by the implementation
-plan. The target shape is a definition class per model, plus a panel plugin:
-
-```php
-MergeDuplicatesPlugin::make()->definitions(['example-records', 'other-records']);
-```
-
-Definitions will supply matching rules, a field allowlist, a scope query,
-authorization, relation strategies and a retirement contract. See
-[docs/support-matrix.md](docs/support-matrix.md) for the exact v1 boundary and the
-blockers for unsupported models and relationships.
+cannot provide equivalent row-lock guarantees. The same rules apply to a host
+application's test suite.
 
 ## Testing
 
