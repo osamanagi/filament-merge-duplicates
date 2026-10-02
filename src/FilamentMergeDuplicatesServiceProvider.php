@@ -15,6 +15,7 @@ use Nagi\FilamentMergeDuplicates\Data\KeyHasher;
 use Nagi\FilamentMergeDuplicates\Data\ScopeHasher;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionValidator;
+use Nagi\FilamentMergeDuplicates\Filament\Banner\DuplicateBannerFactory;
 use Nagi\FilamentMergeDuplicates\Merging\AuditReader;
 use Nagi\FilamentMergeDuplicates\Merging\AuditWriter;
 use Nagi\FilamentMergeDuplicates\Merging\FieldDiffBuilder;
@@ -113,6 +114,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         $this->app->singleton(DismissalService::class);
         $this->app->singleton(SuggestionQuery::class);
         $this->app->singleton(ReviewSummaryQuery::class);
+        $this->app->singleton(DuplicateBannerFactory::class);
 
         $this->app->singleton(DefinitionValidator::class);
         $this->app->singleton(FieldDiffBuilder::class);

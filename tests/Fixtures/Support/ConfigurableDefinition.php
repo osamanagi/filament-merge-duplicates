@@ -79,7 +79,9 @@ final class ConfigurableDefinition extends DuplicateDefinition
 
     public function contextResolver(): ContextResolver
     {
-        return new PanelContextResolver;
+        $resolver = $this->config['contextResolver'] ?? null;
+
+        return $resolver instanceof ContextResolver ? $resolver : new PanelContextResolver;
     }
 
     public function scopedRecordQuery(): ScopedRecordQuery
