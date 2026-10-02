@@ -2,6 +2,7 @@
 
 namespace Nagi\FilamentMergeDuplicates\Filament\Banner;
 
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
@@ -96,12 +97,16 @@ final class DuplicateBannerFactory
      * The review link and the scan control are supplied by the caller, so this
      * method never invents a route that may not exist on the panel.
      *
+     * The scan control is typed as `string|Htmlable|null` because the banner
+     * renders it through Blade's escaped output: a plain string is shown as
+     * text, an `Htmlable` (for example a rendered action) is emitted as markup.
+     *
      * @throws InvalidConfiguration when the ID is not registered
      */
     public function viewFor(
         string $definitionId,
         ?string $reviewUrl = null,
-        ?string $scanAction = null,
+        string | Htmlable | null $scanAction = null,
     ): ?View {
         $banner = $this->forDefinitionId($definitionId);
 

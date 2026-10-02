@@ -80,7 +80,7 @@ Last updated: M0 (compatibility spike and design freeze).
 | A02 | passing | `tests/Execution/MergeExecutionTest.php` | A permission revoked between the preview and the execution aborts before any write, and the executor reauthorizes again inside the transaction. |
 | A03 | passing | `tests/Feature/DefinitionValidationTest.php` | An unknown definition ID cannot be resolved, and an ability map grants nothing to an undeclared actor. |
 | A04 | passing | `tests/Feature/DefinitionValidationTest.php` | Deny-by-default authorizer denies every ability; a service actor gets only explicitly declared abilities; review never implies merge. |
-| A05 | not started | — | |
+| A05 | partial | `tests/Feature/DuplicateReviewPageTest.php` | The review page mounts through the panel plugin with the definition in the route. A definition ID the panel does not expose 404s before the registry is consulted; a forged `startScan` call from an actor without the scan ability 403s and queues nothing; the page view escapes every value. Branch-tampered preview/merge state is slice 5. |
 
 ## Ledger (L)
 
@@ -93,8 +93,8 @@ Last updated: M0 (compatibility spike and design freeze).
 
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
-| U01 | not started | — | |
-| U02 | not started | — | |
+| U01 | partial | `tests/Feature/DuplicateReviewPageTest.php` | The page ships translated strings, labelled controls, `focus-visible` rings and staleness conveyed by text as well as tone. Manual dark/RTL/mobile/keyboard review on both majors is still outstanding. |
+| U02 | partial | `tests/Feature/DuplicateReviewPageTest.php` | Never-scanned, scanning, failed (sanitized reason code only), empty and has-results are distinct states that keep published results on screen; stale members are labelled and a capped preview says how many are hidden. Success and the direct manual pair action are slice 5. |
 | P01 | passing | `tests/Performance/ScanBenchmarkTest.php` | 100,000 records, 1,000-record chunks: 100 chunks, 7.11s, 48.5 MiB peak, 8 MiB growth, 1,413 SQL queries, 300,000 linear membership rows, 200 suggestions. Skipped unless `MERGE_DUPLICATES_BENCHMARK=1`. |
 
 ## Compatibility (C)
@@ -102,12 +102,12 @@ Last updated: M0 (compatibility spike and design freeze).
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
 | C01 | partial | `tests/Execution/MergeRefusalTest.php`, `tests/Concurrency/LockSpikeTest.php` | Executing on SQLite is refused with a configuration error naming the engine and the supported ones, a definition whose model lives on another connection is refused as non-atomic, and the execution suite runs on real MySQL and PostgreSQL. The published engine/version matrix as a whole is M7. |
-| C02 | not started | `tests/Feature/PackageBootTest.php`, `tests/Feature/FilamentActionRenderTest.php` | M0 evidence: both majors install, boot, resolve the panel plugin and render/mount a real action, on all four dependency lanes. Authenticated review and merge journeys are M5. |
+| C02 | partial | `tests/Feature/PackageBootTest.php`, `tests/Feature/FilamentActionRenderTest.php`, `tests/Feature/DuplicateReviewPageTest.php` | M0 evidence: both majors install, boot, resolve the panel plugin and render/mount a real action, on all four dependency lanes. M5 slice 4 adds an authenticated review journey on two unrelated models (integer key and UUID) via the real page, with forged-id and forged-action refusals; 291 tests pass on both the Filament 4.14/Livewire 3.8 and Filament 5.9/Livewire 4.4 lanes. Merge journeys are still outstanding. |
 | C03 | not started | `bin/lane-test.sh`, `bin/resolve-lane.sh` | M0 evidence: four lanes resolve and run, the published constraint `^4.0 \|\| ^5.0` resolves for both majors, and a separate required CI job proves installation on PHP 8.2, 8.3 and 8.4 for each major. Filament 5 behaviour is not executed on PHP 8.2 (dev tooling needs 8.3+) — see ADR 0008. |
 | C04 | not started | — | 4 → 5 upgrade with existing data is M6. |
-| C05 | not started | `tests/Feature/FilamentActionRenderTest.php` | M0 evidence: no adapter was needed for the surfaces verified so far, and both majors passed identical assertions. Adapter coverage for the full UI is M5. |
-| C06 | not started | `tests/Feature/DefinitionValidationTest.php` | M1 evidence: two unrelated definitions with different rules, fields and labels coexist in one registry and are resolved by ID. Panel UI and per-panel permissions are M5. |
-| C07 | not started | — | Scalar-only and relation-bearing definitions is M1/M5. |
+| C05 | partial | `tests/Feature/FilamentActionRenderTest.php`, `tests/Feature/DuplicateReviewPageTest.php` | M0 evidence: no adapter was needed for the surfaces verified so far, and both majors passed identical assertions. M5 slice 4 adds page route generation, panel page registration, Livewire mount from a route parameter and Livewire state updates, verified on both majors with identical assertions and no adapter. Modal actions, render hooks and asset rendering remain. |
+| C06 | partial | `tests/Feature/DefinitionValidationTest.php`, `tests/Feature/DuplicateReviewPageTest.php` | M1 evidence: two unrelated definitions with different rules, fields and labels coexist in one registry and are resolved by ID. M5 slice 4 proves one panel plugin serves both an integer-keyed and a UUID-keyed definition, each with its own review URL and independent heading, and that an ID outside the panel list 404s. Shared terminal retirement identity across panels is M6. |
+| C07 | partial | `tests/Feature/DuplicateReviewPageTest.php` | The review page renders both the scalar-only UUID-keyed resource and the integer-keyed resource. Relation impact in the UI is slice 5; relation-bearing merge execution is already covered by M4. |
 
 ## Property tests
 

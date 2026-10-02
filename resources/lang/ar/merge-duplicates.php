@@ -44,4 +44,25 @@ return [
         'retry_scan' => 'إعادة المحاولة',
     ],
 
+    'review' => [
+        'title' => 'مراجعة السجلات المكررة',
+        'heading' => 'السجلات المكررة: :label',
+        'groups_total' => ':count مجموعة محتملة|:count مجموعات محتملة',
+        'groups_heading' => 'المجموعات المقترحة',
+        'records' => ':count سجل|:count سجلات',
+        'stale_badge' => 'تغيّر بعد البحث',
+        'not_reviewable_badge' => 'لا يمكن الدمج الآن',
+        'member_missing' => 'مفقود',
+        'member_retired' => 'تم دمجه',
+        'member_changed' => 'لم يعد مطابقًا',
+        'showing_of' => 'عرض :shown من :total سجلًا',
+        'pagination' => 'صفحات مجموعات السجلات المكررة',
+        'previous' => 'السابق',
+        'next' => 'التالي',
+        'page_of' => 'صفحة :page من :last',
+        'empty_body' => 'اكتمل آخر بحث ولم يجد أي مجموعة قابلة للمراجعة.',
+        'never_scanned_body' => 'لم يتم البحث في هذا المورد بعد. شغّل البحث للكشف عن السجلات المكررة المحتملة.',
+        'scan_already_running' => 'يوجد بحث قيد التشغيل بالفعل في هذا النطاق.',
+    ],
+
 ];

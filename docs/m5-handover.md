@@ -1,13 +1,15 @@
 # M5 handover — Filament experience (in progress)
 
-Status: **M5 is not finished and its gate is not met.** Four slices are implemented,
-tested and pushed; the Filament-facing page is the next step.
+Status: **M5 is not finished and its gate is not met.** Five slices are implemented
+and tested on both majors; slice 5 (merge preview, dismissal, audit view) and slice 6
+(accessibility, assets, browser review) remain.
 
 ## Branch state
 
 - Working branch: `m5/filament-experience`
-- Latest commit: `e76631d` (authorized scan starter)
-- Earlier M5 commits: `dd03dd2` (review summary), `a13278b` (banner), `0226bf3` (review list)
+- Latest commit: this commit (review page, host trait, plugin page registration)
+- Earlier M5 commits: `f0b2702` (handover), `e76631d` (authorized scan starter),
+  `dd03dd2` (review summary), `a13278b` (banner), `0226bf3` (review list)
 - `main` is at `61f726f` (M4 merged via PR #5). M0–M4 are complete and merged.
 - Spec: `filament-merge-duplicates-implementation-plan.md` — §4 (UI, lines 71–95), §5 (integration API),
   §7–9 (merge policy, relations, transaction), §11 (cases), §13 M5 (line 431), plus the M5 gate text.
@@ -20,6 +22,7 @@ tested and pushed; the Filament-facing page is the next step.
 | Banner | `a13278b` | `src/Filament/Banner/DuplicateBanner.php`, `DuplicateBannerFactory.php`, `resources/views/banner.blade.php`, `resources/lang/{en,ar}/merge-duplicates.php`, `tests/Feature/DuplicateBannerTest.php`, fixture `tests/Fixtures/Definitions/BannerResourceDuplicates.php` |
 | Review list | `0226bf3` | `src/Scanning/ReviewGroupQuery.php`, `ReviewGroup.php`, `ReviewMember.php`, `tests/Feature/ReviewGroupQueryTest.php` |
 | Authorized scan seam | `e76631d` | `src/Scanning/ScanStarter.php`, `tests/Feature/ScanStarterTest.php` |
+| Review page + host trait + plugin wiring | this commit | `src/Filament/Pages/DuplicateReviewPage.php`, `src/Filament/Concerns/HasDuplicateSuggestions.php`, `resources/views/review-page.blade.php`, `src/FilamentMergeDuplicatesPlugin.php`, `resources/lang/{en,ar}/merge-duplicates.php`, `tests/Feature/DuplicateReviewPageTest.php`, fixture `tests/Fixtures/Livewire/DuplicateBannerProbe.php`, `docs/compatibility.md`, `docs/test-case-map.md` |
 
 Guarantees these already enforce (do not regress them):
 
@@ -38,30 +41,38 @@ Guarantees these already enforce (do not regress them):
 - An unregistered definition ID throws `InvalidConfiguration` rather than hiding a
   misconfiguration behind a missing banner.
 
-## Next step (slice 4), in order
+## Slice 4 — implemented (this commit)
 
-1. **Verify the Page/Livewire APIs first.** `docs/compatibility.md` lists
-   Page/action/hooks/asset APIs, Livewire state updates and modal actions as M5
-   re-verification points; only `Plugin`/`Panel`/`PanelProvider`, `HasActions`/
-   `InteractsWithActions`, `HasSchemas`/`InteractsWithSchemas` and the `TestsActions`
-   assertions are verified so far. `Filament\Pages\Page`, its route generation, panel
-   navigation and panel-aware Livewire page testing are **unverified**.
-2. **The review page**: bucket/group list using `ReviewGroupQuery` (already returns
-   `groups`, `total`, `page`, `perPage`, `lastPage`, and per-group `members`,
-   `memberCount`, `isReviewable()`, `hasStaleMember()`, `hiddenMemberCount()`),
-   pagination, per-group member preview with a "showing X of Y" affordance, and the
-   stale/empty/never-scanned/failed states from `ReviewSummary`/`DuplicateBanner`.
-3. **`HasDuplicateSuggestions` trait** — deleted from an earlier attempt on purpose:
-   PHPStan reports `trait.unused` while nothing in `src/` consumes it, and an
-   unanalysed trait body is worse than no trait. Add it together with the page that
-   uses it. Intended API: `duplicateDefinitionId()` (host implements, throws if
-   missing), `duplicateDefinition()`, `duplicateContext()`, `canReviewDuplicates()`,
-   `duplicateBanner()`, `duplicateBannerView($reviewUrl, $scanAction)`.
-4. **`MergeDuplicatesPlugin::definitions([...])`** (plan §5) and page registration in
-   the plugin's `register(Panel $panel)` (currently an empty stub).
-5. **Wire the links the earlier slices already accept**: the banner takes
-   `$reviewUrl` and `$scanAction`; `ScanStarter::start()` is the authorized way to
-   start a scan. Nothing needs to invent a route or duplicate business logic.
+1. **Page/Livewire APIs verified on both majors.** `docs/compatibility.md` now records
+   the verified page route registration, route naming, URL generation, navigation,
+   panel page registration, `mount()` route parameters, Livewire state updates and
+   panel-aware page testing, with the lane versions and results. No adapter was needed.
+2. **The review page** (`src/Filament/Pages/DuplicateReviewPage.php`) lists groups from
+   `ReviewGroupQuery` with pagination, a capped member preview with a "showing X of Y"
+   affordance, and the never-scanned/scanning/failed/empty/has-results states. Its
+   header reuses the banner model, so the wording and count cannot drift from the
+   banner. The scan button calls `ScanStarter`, so authorization is never duplicated.
+3. **`HasDuplicateSuggestions`** is back and consumed by the page (PHPStan analyses it);
+   the fixture `DuplicateBannerProbe` exercises the host path with a review URL and an
+   HTML-safe scan action.
+4. **`MergeDuplicatesPlugin::definitions([...])`** validates its IDs and
+   `register(Panel)` now registers the page. A definition ID outside the panel list
+   404s before the registry is consulted.
+5. **Wiring**: the page URL comes from `DuplicateReviewPage::urlForDefinition()` and the
+   trait passes it to the banner; the banner's scan slot accepts a rendered `Htmlable`
+   action. No route is invented at a call site.
+
+### Decisions taken in slice 4
+
+- One page class, with the definition ID in the route (`merge-duplicates/{definition}`)
+  and `getRelativeRouteName()` overridden so the route name is parameter-free. The page
+  is not registered in navigation (`shouldRegisterNavigation()` is false): a single nav
+  entry cannot know which definition a visitor wants, and the banner is the entry
+  point. Hosts can add one entry per definition with `urlForDefinition()`.
+- The page renders with plain semantic markup and `wire:click`, not Filament Blade
+  components, for the same cross-major reason as the banner.
+- Blade renders the embedded banner `View` with `{!! ... !!}` rather than `{{ ... }}`:
+  `{{ }}` HTML-escapes a `View` here even though it implements `Htmlable`.
 
 ## Remaining after slice 4
 
@@ -117,7 +128,7 @@ Case-map rows still `not started`: `U01`, `U02`, `A05`, `C06` and `C07` are part
 ## Verification commands for this branch
 
 ```bash
-./vendor/bin/pest --no-coverage            # 272 passed, 1 skipped, 864 assertions at e76631d
+./vendor/bin/pest --no-coverage            # 291 passed, 1 skipped, 927 assertions
 ./vendor/bin/phpstan analyse --memory-limit=1G
 ./vendor/bin/pint --test
 ./vendor/bin/pest --coverage --min=0       # coverage total (pcov; xdebug is absent)

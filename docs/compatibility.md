@@ -95,11 +95,43 @@ bin/resolve-lane.sh '^4.0'         # resolve as the local PHP
 bin/resolve-lane.sh '^5.0' 8.2.0   # resolve as if the host ran PHP 8.2
 ```
 
+## M5 verification — Filament page and Livewire surfaces
+
+M5 slice 4 added the first real panel page, so the page, route, navigation and
+Livewire surfaces are now verified instead of assumed. The page classes were read
+directly in both installed trees (Filament 5.9.0 locally, Filament 4.14.0 from the
+`v4.14.0` tag), and the identical suite was executed on both lanes.
+
+| Surface | Filament 4.14.0 | Filament 5.9.0 |
+| --- | --- | --- |
+| `Filament\Pages\Page` / `BasePage` | extends `Livewire\Component`, uses the actions and schemas traits | identical |
+| Page route registration | `HasRoutes::routes()` — `Route::get('/'.getSlug(), static::class)->name(getRelativeRouteName())` inside `Route::name('pages.')->group()` | identical |
+| Page route naming | `Page::getRouteName()` returns the panel-prefixed `pages.<relative>` name | identical |
+| Page URL generation | static `Page::getUrl(array $parameters, ...)` → `route(getRouteName(), $parameters)` | identical |
+| Navigation | `getNavigationItems()` / `getNavigationUrl()`; skipped when `shouldRegisterNavigation()` is false | identical |
+| Panel page registration | `Panel::pages(array)` (`Panel\Concerns\HasComponents`) | identical |
+| Plugin `register(Panel)` | invoked by `Panel::plugin()` | identical |
+| Livewire mount from a route parameter | `mount(string $definition)` receives the route segment | identical |
+| Livewire state updates | `->call('startScan')` re-renders with the new summary and state | identical |
+| Panel-aware Livewire page test | `livewire(Page::class, ['definition' => $id])`; `mount()` `abort(404)`/`abort(403)` surface as `assertNotFound()`/`assertForbidden()` | identical |
+
+Evidence: the full suite ran on both lanes in an isolated checkout —
+Filament 4.14.0 / Livewire 3.8.10 / Laravel 12.69.3 / Testbench 10.12.0 and
+Filament 5.9.0 / Livewire 4.4.7 / Laravel 12.69.3 / Testbench 10.12.0 —
+291 passed, 1 skipped, 927 assertions on each. The page tests are
+`tests/Feature/DuplicateReviewPageTest.php`.
+
+No compatibility adapter was needed for these surfaces. The page deliberately uses
+plain semantic markup and `wire:click` rather than Filament Blade components, for the
+same cross-major reason as the banner: the rendered output is then identical on both
+majors without a version check. Modal actions, render hooks and asset rendering are
+**not** verified here and remain open for the M5 gate.
+
 ## Re-verification points
 
 | Milestone | Must re-verify |
 | --- | --- |
-| M5 | Page/action/hooks/asset APIs on both majors, Livewire state updates, modal actions |
+| M5 | Page/route/navigation and Livewire state surfaces: verified on both majors (see above). Modal actions, render hooks, asset rendering and manual browser review are outstanding. |
 | M6 | A Filament 4 → 5 upgrade against existing package data, without a data reset |
 | M7 | Full matrix, resolved version range matching the published constraints |
 
