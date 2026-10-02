@@ -10,8 +10,17 @@ use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentIcon;
 use Illuminate\Filesystem\Filesystem;
 use Livewire\Features\SupportTesting\Testable;
-use Nagi\FilamentMergeDuplicates\Commands\FilamentMergeDuplicatesCommand;
+use Nagi\FilamentMergeDuplicates\Commands\ScanDuplicatesCommand;
+use Nagi\FilamentMergeDuplicates\Data\KeyHasher;
+use Nagi\FilamentMergeDuplicates\Data\ScopeHasher;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
+use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
+use Nagi\FilamentMergeDuplicates\Scanning\DismissalService;
+use Nagi\FilamentMergeDuplicates\Scanning\KeyBuilder;
+use Nagi\FilamentMergeDuplicates\Scanning\ScanChunkProcessor;
+use Nagi\FilamentMergeDuplicates\Scanning\ScanCoordinator;
+use Nagi\FilamentMergeDuplicates\Scanning\ScopeManager;
+use Nagi\FilamentMergeDuplicates\Scanning\SuggestionQuery;
 use Nagi\FilamentMergeDuplicates\Testing\TestsFilamentMergeDuplicates;
 use Spatie\LaravelPackageTools\Commands\InstallCommand;
 use Spatie\LaravelPackageTools\Package;
@@ -62,6 +71,31 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
     public function packageRegistered(): void
     {
         $this->app->singleton(DefinitionRegistry::class);
+
+        $this->app->singleton(KeyHasher::class, fn (): KeyHasher => KeyHasher::fromConfig(
+            is_string(config('merge-duplicates.secret')) ? config('merge-duplicates.secret') : null,
+        ));
+
+        $this->app->singleton(ScopeHasher::class, fn (): ScopeHasher => ScopeHasher::fromConfig(
+            is_string(config('merge-duplicates.secret')) ? config('merge-duplicates.secret') : null,
+        ));
+
+        $this->app->singleton(KeyBuilder::class);
+        $this->app->singleton(RetirementResolver::class);
+        $this->app->singleton(ScopeManager::class);
+
+        $this->app->singleton(
+            ScanChunkProcessor::class,
+            fn (): ScanChunkProcessor => new ScanChunkProcessor(
+                $this->app->make(KeyBuilder::class),
+                $this->app->make(RetirementResolver::class),
+                (int) config('merge-duplicates.scan.chunk_size', 1000),
+            ),
+        );
+
+        $this->app->singleton(ScanCoordinator::class);
+        $this->app->singleton(DismissalService::class);
+        $this->app->singleton(SuggestionQuery::class);
     }
 
     public function packageBooted(): void
@@ -123,7 +157,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
     protected function getCommands(): array
     {
         return [
-            FilamentMergeDuplicatesCommand::class,
+            ScanDuplicatesCommand::class,
         ];
     }
 

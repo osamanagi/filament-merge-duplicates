@@ -53,6 +53,34 @@ behaviour. Blade templates, migrations and frontend behaviour are verified
 through integration and browser assertions because PHP line coverage does not
 measure their semantics.
 
+## Scan benchmark
+
+The plan requires a measured scan of 100,000 records in 1,000-record chunks. It is a
+measurement, not a promised SLA:
+
+```bash
+MERGE_DUPLICATES_BENCHMARK=1 vendor/bin/pest tests/Performance
+```
+
+It is skipped by default because it is slow and a laptop is not a benchmark rig.
+
+Recorded run (2026-10-02, Apple arm64, in-memory SQLite, PHP 8.4.22, single process):
+
+| Metric | Value |
+| --- | --- |
+| Records | 100,000 |
+| Chunk size / chunks | 1,000 / 100 |
+| Wall time | 7.11 s (~14,058 records/second) |
+| Peak memory | 48.5 MiB (target: under 256 MiB) |
+| Memory growth | 8 MiB |
+| SQL queries | 1,413 (~14 per chunk, not per record) |
+| Membership rows | 300,000 = records x rules (linear, never pairs) |
+| Suggestions | 200 |
+
+The assertions enforce the properties that matter rather than the timings: chunking is
+real, index storage stays linear in records x rules, and peak memory stays under the
+target.
+
 ## Database services
 
 Feature, persistence and concurrency tests require real engines:
