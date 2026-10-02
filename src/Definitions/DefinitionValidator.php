@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition as DuplicateDefinitionContract;
 use Nagi\FilamentMergeDuplicates\Data\ConfigurationIssue;
 use Nagi\FilamentMergeDuplicates\Data\ConfigurationReport;
@@ -246,6 +247,18 @@ final class DefinitionValidator
     }
 
     /**
+     * A merge field must read something. A real column is the normal case; an
+     * accessor or a cast is accepted because the field is then still readable
+     * and comparable rather than permanently null.
+     */
+    private function fieldResolvesToAValue(Model $model, string $name): bool
+    {
+        return Schema::hasColumn($model->getTable(), $name)
+            || $model->hasGetMutator($name)
+            || $model->hasCast($name);
+    }
+
+    /**
      * @param  list<ConfigurationIssue>  $issues
      */
     private function checkFields(DuplicateDefinitionContract $definition, Model $model, array &$issues): void
@@ -289,7 +302,35 @@ final class DefinitionValidator
                 continue;
             }
 
+            // Eloquent resolves a missing attribute through a same-named method,
+            // so a field that shadows a method would silently read a relation or
+            // an accessor instead of the column.
+            if (method_exists($model, $name)) {
+                $shadowedModel = $model::class;
+
+                $issues[] = ConfigurationIssue::blocker(
+                    'invalid_configuration',
+                    "The field [{$name}] shadows a method on [{$shadowedModel}], so reading it would not return the column.",
+                    "fields.{$name}",
+                );
+
+                continue;
+            }
+
             $cast = $casts[$name] ?? null;
+
+            if (! $this->fieldResolvesToAValue($model, $name)) {
+                // A field that resolves to nothing would be read as null on every
+                // record, so a typo would silently drop it from the merge instead
+                // of failing.
+                $issues[] = ConfigurationIssue::blocker(
+                    'invalid_configuration',
+                    "The field [{$name}] is not a column on [{$model->getTable()}] and the model exposes no accessor for it, so the merge would silently ignore it.",
+                    "fields.{$name}",
+                );
+
+                continue;
+            }
 
             if (is_string($cast) && $this->isUnsupportedCast($cast)) {
                 $issues[] = ConfigurationIssue::blocker(

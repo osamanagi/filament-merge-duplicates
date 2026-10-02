@@ -81,6 +81,7 @@ final class ContactDuplicates extends DuplicateDefinition
     {
         return [
             MergeField::make('reference')->label('Reference'),
+            MergeField::make('external_ref')->label('External reference'),
             MergeField::make('display_name')->label('Display name'),
             MergeField::make('notes')->label('Notes')->audited(false),
         ];
@@ -88,7 +89,7 @@ final class ContactDuplicates extends DuplicateDefinition
 
     public function relations(): array
     {
-        return [new CompleteHasMany('notes')];
+        return [new CompleteHasMany('childNotes')];
     }
 
     public function acknowledgesCompleteReferenceInventory(): bool

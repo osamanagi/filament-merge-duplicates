@@ -14,6 +14,13 @@ use Nagi\FilamentMergeDuplicates\Commands\ScanDuplicatesCommand;
 use Nagi\FilamentMergeDuplicates\Data\KeyHasher;
 use Nagi\FilamentMergeDuplicates\Data\ScopeHasher;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
+use Nagi\FilamentMergeDuplicates\Definitions\DefinitionValidator;
+use Nagi\FilamentMergeDuplicates\Merging\FieldDiffBuilder;
+use Nagi\FilamentMergeDuplicates\Merging\Fingerprinter;
+use Nagi\FilamentMergeDuplicates\Merging\MergePlanner;
+use Nagi\FilamentMergeDuplicates\Merging\PreviewStore;
+use Nagi\FilamentMergeDuplicates\Merging\RelationPlanBuilder;
+use Nagi\FilamentMergeDuplicates\Merging\SurvivorRecommender;
 use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
 use Nagi\FilamentMergeDuplicates\Scanning\DismissalService;
 use Nagi\FilamentMergeDuplicates\Scanning\KeyBuilder;
@@ -96,6 +103,27 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         $this->app->singleton(ScanCoordinator::class);
         $this->app->singleton(DismissalService::class);
         $this->app->singleton(SuggestionQuery::class);
+
+        $this->app->singleton(DefinitionValidator::class);
+        $this->app->singleton(FieldDiffBuilder::class);
+        $this->app->singleton(SurvivorRecommender::class);
+        $this->app->singleton(Fingerprinter::class);
+
+        $this->app->singleton(
+            RelationPlanBuilder::class,
+            fn (): RelationPlanBuilder => new RelationPlanBuilder(
+                (int) config('merge-duplicates.relations.max_children_per_merge', 500),
+            ),
+        );
+
+        $this->app->singleton(
+            PreviewStore::class,
+            fn (): PreviewStore => new PreviewStore(
+                (int) config('merge-duplicates.preview.ttl_minutes', 15),
+            ),
+        );
+
+        $this->app->singleton(MergePlanner::class);
     }
 
     public function packageBooted(): void

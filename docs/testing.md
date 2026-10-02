@@ -47,6 +47,10 @@ the threshold must never be lowered to make a lane pass. CI runs the coverage jo
 in draft (non-blocking) mode until M7, and reports the measured percentage so
 regressions are visible.
 
+Measured totals so far: M2 69.6%, M3 76.1% (`src/` lines, pcov, full suite). The
+remainder is mostly the merge execution and UI paths that later milestones add,
+plus their error branches.
+
 Coverage is a code-execution metric, not behavioural proof. The acceptance cases
 in the case map, the real-database lanes and the UI assertions are what prove
 behaviour. Blade templates, migrations and frontend behaviour are verified

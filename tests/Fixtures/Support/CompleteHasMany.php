@@ -14,6 +14,7 @@ final class CompleteHasMany implements RelationStrategy
         private readonly string $name,
         private readonly bool $complete = true,
         private readonly RelationType $type = RelationType::HasMany,
+        private readonly bool $includesSoftDeletedChildren = false,
     ) {}
 
     public function name(): string
@@ -29,6 +30,11 @@ final class CompleteHasMany implements RelationStrategy
     public function ownsCompleteInventory(): bool
     {
         return $this->complete;
+    }
+
+    public function includesSoftDeletedChildren(): bool
+    {
+        return $this->includesSoftDeletedChildren;
     }
 
     public function signature(): string

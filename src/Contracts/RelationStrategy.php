@@ -31,6 +31,14 @@ interface RelationStrategy
     public function ownsCompleteInventory(): bool;
 
     /**
+     * Whether soft-deleted children must be transferred too.
+     *
+     * A deleted child still needs declared handling: silently leaving it behind
+     * would orphan a record the host may still reference.
+     */
+    public function includesSoftDeletedChildren(): bool;
+
+    /**
      * Deterministic signature used in the relation fingerprint.
      */
     public function signature(): string;
