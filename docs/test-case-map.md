@@ -11,27 +11,27 @@ Last updated: M0 (compatibility spike and design freeze).
 
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
-| D01 | not started | — | |
+| D01 | passing | `tests/Feature/ScanTest.php` | Only the pair sharing a normalised matching value is suggested; blank and invalid values produce no key. |
 | D02 | passing | `tests/Unit/Normalization/NormalizerTest.php` | Null, empty, whitespace, invalid email and unsupported types all produce no key. |
 | D03 | passing | `tests/Unit/Normalization/NormalizerTest.php` | Case is an explicit option that changes the normalizer version; email domain is lowercased, local part only when opted in; originals are never mutated. |
 | D04 | passing | `tests/Unit/Data/TupleEncoderTest.php`, `tests/Unit/Matching/ExactRuleTest.php` | Composite partial matches produce no key; delimiter and type collisions are structurally impossible; field order is significant. |
 | D05 | passing | `tests/Unit/Data/RecordIdTest.php`, `tests/Unit/Normalization/NormalizerTest.php` | Bigint keys stay exact beyond PHP_INT_MAX; `0`, `'0'`, `false` and `null` remain distinct; ordering is symmetric and stable per key domain. |
 | D06 | passing | `tests/Unit/Normalization/NormalizerTest.php` | Arabic, emoji and combining marks round-trip verbatim; NFC is opt-in and versioned. |
-| D07 | not started | — | |
-| D08 | not started | — | |
+| D07 | passing | `tests/Feature/ScanTest.php` | Overlapping A-B and B-C buckets are both shown and no A-C match is inferred; reasons are per rule. |
+| D08 | passing | `tests/Feature/ScanTest.php` | Ten records sharing one value produce exactly ten membership rows (one per record, never one per pair) and members are paginated. |
 | D09 | passing | `tests/Unit/Data/KeyHashingTest.php`, `tests/Feature/DefinitionValidationTest.php` | Duplicate definition and rule IDs raise early configuration errors; revision, key version and secret changes all invalidate digests. |
-| D10 | not started | — | |
+| D10 | passing | `tests/Feature/ScanTest.php` | Five UUID-keyed records at a chunk size of two are indexed exactly once across three keyset chunks. |
 
 ## Scans (S)
 
 | ID | State | Test | Notes |
 | --- | --- | --- | --- |
-| S01 | not started | — | |
-| S02 | not started | — | |
-| S03 | not started | — | |
-| S04 | not started | — | |
-| S05 | not started | — | |
-| S06 | not started | — | |
+| S01 | passing | `tests/Feature/ScanTest.php` | Re-processing a chunk does not duplicate memberships; a cancelled scan never publishes a generation; a failed scan leaves the previous generation active. |
+| S02 | passing | `tests/Feature/ScanTest.php` | A second active scan for the same scope is refused, and two tenants scan and store independently. |
+| S03 | passing | `tests/Feature/ScanTest.php` | A record added after a scan is picked up by the next scan; the run is acknowledged as eventually consistent rather than a snapshot. |
+| S04 | passing | `tests/Feature/ScanTest.php` | Never-scanned is distinguishable from scanned-with-no-results. |
+| S05 | passing | `tests/Feature/ScanTest.php` | A service context without an actor fails closed, and a scope with no tenant indexes nothing instead of falling back to an unscoped query. |
+| S06 | passing | `tests/Feature/ScanTest.php` | A dismissed pair is suppressed while other buckets remain; an unrelated field change does not resurrect it while a matching-input change does; dismissals are canonical and reopenable. |
 
 ## Field merging (F)
 
@@ -95,7 +95,7 @@ Last updated: M0 (compatibility spike and design freeze).
 | --- | --- | --- | --- |
 | U01 | not started | — | |
 | U02 | not started | — | |
-| P01 | not started | — | |
+| P01 | passing | `tests/Performance/ScanBenchmarkTest.php` | 100,000 records, 1,000-record chunks: 100 chunks, 7.11s, 48.5 MiB peak, 8 MiB growth, 1,413 SQL queries, 300,000 linear membership rows, 200 suggestions. Skipped unless `MERGE_DUPLICATES_BENCHMARK=1`. |
 
 ## Compatibility (C)
 

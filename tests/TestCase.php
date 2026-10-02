@@ -14,7 +14,7 @@ use Filament\Support\SupportServiceProvider;
 use Filament\Tables\TablesServiceProvider;
 use Filament\Widgets\WidgetsServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\LivewireServiceProvider;
 use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesServiceProvider;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\User;
@@ -25,7 +25,6 @@ use RyanChandler\BladeCaptureDirective\BladeCaptureDirectiveServiceProvider;
 
 class TestCase extends Orchestra
 {
-    use LazilyRefreshDatabase;
     use WithWorkbench;
 
     protected function setUp(): void
@@ -36,7 +35,42 @@ class TestCase extends Orchestra
             fn (string $modelName) => 'Nagi\\FilamentMergeDuplicates\\Database\\Factories\\' . class_basename($modelName) . 'Factory'
         );
 
+        // Every test gets its own freshly migrated in-memory database. The
+        // schema is therefore deterministic, schema introspection inside the
+        // code under test is meaningful, and no test can leak rows into
+        // another. Migrations are applied directly rather than through
+        // `artisan migrate`, because the framework migrator's path bookkeeping
+        // interacts badly with a database that outlives a single test.
+        DB::purge('testing');
+
+        foreach ($this->migrationFiles() as $file) {
+            (require $file)->up();
+        }
+
         $this->app['view']->addNamespace('duplicate-tests', __DIR__ . '/Fixtures/views');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function migrationFiles(): array
+    {
+        $paths = [
+            dirname(__DIR__) . '/database/migrations',
+            __DIR__ . '/Fixtures/database/migrations',
+        ];
+
+        $files = [];
+
+        foreach ($paths as $path) {
+            foreach (glob($path . '/*.php') ?: [] as $file) {
+                $files[] = $file;
+            }
+        }
+
+        sort($files);
+
+        return $files;
     }
 
     protected function getPackageProviders($app)
@@ -66,35 +100,17 @@ class TestCase extends Orchestra
 
     public function getEnvironmentSetUp($app): void
     {
-        // A file-backed SQLite database is used instead of :memory: because the
-        // in-memory database is shared for the whole test process, which makes
-        // the framework's schema refresh non-deterministic. A file database
-        // gives every refresh a real drop-and-recreate.
-        $database = dirname(__DIR__) . '/build/testing.sqlite';
-
-        if (! is_dir(dirname($database))) {
-            mkdir(dirname($database), 0755, true);
-        }
-
-        if (! file_exists($database)) {
-            touch($database);
-        }
-
+        // An in-memory database is purged and re-migrated for every test in
+        // setUp(), so each test starts from an empty schema.
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
             'driver' => 'sqlite',
-            'database' => $database,
+            'database' => ':memory:',
             'prefix' => '',
             'foreign_key_constraints' => true,
         ]);
 
         $app['config']->set('auth.providers.users.model', User::class);
         $app['config']->set('app.key', 'base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=');
-    }
-
-    protected function defineDatabaseMigrations(): void
-    {
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
-        $this->loadMigrationsFrom(__DIR__ . '/Fixtures/database/migrations');
     }
 }
