@@ -37,6 +37,7 @@ use Nagi\FilamentMergeDuplicates\Scanning\ReviewGroupQuery;
 use Nagi\FilamentMergeDuplicates\Scanning\ReviewSummaryQuery;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanChunkProcessor;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanCoordinator;
+use Nagi\FilamentMergeDuplicates\Scanning\ScanStarter;
 use Nagi\FilamentMergeDuplicates\Scanning\ScopeManager;
 use Nagi\FilamentMergeDuplicates\Scanning\SuggestionQuery;
 use Nagi\FilamentMergeDuplicates\Testing\TestsFilamentMergeDuplicates;
@@ -115,6 +116,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         $this->app->singleton(DismissalService::class);
         $this->app->singleton(SuggestionQuery::class);
         $this->app->singleton(ReviewSummaryQuery::class);
+        $this->app->singleton(ScanStarter::class);
         $this->app->singleton(ReviewGroupQuery::class);
         $this->app->singleton(DuplicateBannerFactory::class);
 
