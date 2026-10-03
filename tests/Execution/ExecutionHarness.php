@@ -2,16 +2,20 @@
 
 namespace Nagi\FilamentMergeDuplicates\Tests\Execution;
 
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Data\RecordId;
+use Nagi\FilamentMergeDuplicates\Data\RecordIdType;
 use Nagi\FilamentMergeDuplicates\Definitions\MergeField;
 use Nagi\FilamentMergeDuplicates\Matching\ExactRule;
 use Nagi\FilamentMergeDuplicates\Merging\MergePlan;
 use Nagi\FilamentMergeDuplicates\Merging\MergePlanner;
+use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
+use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
 use Nagi\FilamentMergeDuplicates\Scanning\ScopeManager;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Contact;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Note;
@@ -249,5 +253,74 @@ trait ExecutionHarness
             $source,
             RecordId::fromModel($survivor),
         );
+    }
+
+    /**
+     * A confirmable pair and the stored preview for it.
+     *
+     * The two records are equal in every allowed field, so the plan needs no
+     * choice and every refusal below is about the state around it rather than
+     * about an unanswered field.
+     *
+     * @return array{0: ConfigurableDefinition, 1: DuplicateContext, 2: MergePlan, 3: Contact, 4: Contact}
+     */
+    public function refusalPlan(): array
+    {
+        $definition = $this->makeDefinition();
+        $context = $this->contextFor($definition);
+        $survivor = $this->makeContact(['reference' => 'ACME']);
+        $source = $this->makeContact(['reference' => 'ACME']);
+        $plan = $this->planFor($context, $definition, $survivor, $source);
+
+        return [$definition, $context, $plan, $source, $survivor];
+    }
+
+    /**
+     * Replaces the payload of a stored preview with a different plan, keeping the
+     * operation ID. This is what a browser holding a token cannot do, so it is how
+     * the executor's "the stored plan does not describe this pair" guards are
+     * exercised: the row is genuine, its contents are not.
+     */
+    public function replaceStoredPlan(string $engine, MergePlan $original, MergePlan $replacement): void
+    {
+        $payload = json_encode($replacement->toPayload(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+
+        DB::connection($engine)->table('filament_merge_duplicates_previews')
+            ->where('operation_id', $original->operationId)
+            ->update([
+                'plan_payload' => Crypt::encryptString($payload),
+                'payload_hash' => hash('sha256', $payload),
+            ]);
+    }
+
+    /**
+     * Records a terminal retirement for one record, exactly as an earlier merge
+     * would have left it: under its own operation, so it cannot be mistaken for
+     * a replay of the operation under test.
+     */
+    public function retireInLedger(
+        string $engine,
+        ConfigurableDefinition $definition,
+        Contact $contact,
+    ): MergeRecord {
+        $retirement = app(RetirementResolver::class);
+
+        return MergeRecord::on($engine)->create([
+            'operation_id' => '01HZX8J9K5N7Q2V3W4X5Y6' . str_pad((string) $contact->getKey(), 4, '0', STR_PAD_LEFT),
+            'scope_id' => '01HZX8J9K5N7Q2V3W4X5Y6R' . str_pad((string) $contact->getKey(), 3, '0', STR_PAD_LEFT),
+            'retirement_domain' => $retirement->domainDigest(
+                $definition->connection(),
+                $definition->model(),
+                $definition->ownershipDomain(),
+            ),
+            'source_id' => (string) $contact->getKey(),
+            'source_id_type' => RecordId::fromModel($contact)->type->value,
+            'survivor_id' => '999999',
+            'survivor_id_type' => RecordIdType::Int->value,
+            'actor_ref' => 'actor-1',
+            'definition_revision' => $definition->revision(),
+            'audit_payload' => 'placeholder',
+            'committed_at' => now(),
+        ]);
     }
 }

@@ -249,21 +249,6 @@ final class MergeExecutor
                 $driver,
             ));
         }
-
-        $class = $definition->model();
-        $instance = new $class;
-        $modelConnection = $instance->getConnectionName() ?? (string) config('database.default');
-
-        if ($modelConnection !== $definition->connection()) {
-            // The transaction and the model writes would live on different
-            // connections, so the merge could not be rolled back as one unit.
-            throw InvalidConfiguration::for($definition->id(), sprintf(
-                'the definition runs on connection [%s] while [%s] uses [%s], so a merge could not be atomic.',
-                $definition->connection(),
-                $class,
-                $modelConnection,
-            ));
-        }
     }
 
     private function assertPlanMatchesDefinition(MergePlan $plan, DuplicateDefinition $definition): void
