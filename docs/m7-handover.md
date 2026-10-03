@@ -10,7 +10,7 @@ Branch: `m7/stable-v1.0`, cut from the M6 tip so it carries M6 until that merges
 
 | Gate item from the plan | Evidence |
 | --- | --- |
-| 100% of *reachable* `src/` lines, on both Filament majors, with reviewed branch gaps | 98.2% of all lines, with every remaining line enumerated below; 615 passed / 1 skipped / 1707 assertions, identical on Filament 4.11 and Filament 5.9 |
+| 100% of *reachable* `src/` lines, on both Filament majors, with reviewed branch gaps | 98.2% of all lines, with every remaining line enumerated below; 624 passed / 1 skipped / 1746 assertions, identical on Filament 4 and Filament 5 |
 | No unresolved data-loss or authorization bug | Two real defects found and fixed (below); the authorization paths are covered by refusal tests in every layer |
 | Every case ID mapped | `docs/test-case-map.md`, refreshed with the M7 tests |
 | C02–C07 pass | Executed and recorded in `docs/test-case-map.md` |
@@ -23,12 +23,14 @@ Branch: `m7/stable-v1.0`, cut from the M6 tip so it carries M6 until that merges
 Measured with pcov on the full suite, `src/` only:
 
 ```
-vendor/bin/pest --coverage --min=98        # 98.2%, 615 passed, 1 skipped
+vendor/bin/pest --coverage --min=98        # 98.2%, 624 passed, 1 skipped
 ```
 
-Both lanes report the same totals (`bin/lane-test.sh '^4.0'` and `'^5.0'`: 615
-passed, 1 skipped, 1707 assertions each), which is the point of the single
-release line: the same suite, the same percentages, two Filament majors.
+Both lanes report the same totals (`bin/lane-test.sh '^4.0'` and `'^5.0'`: 624
+passed, 1 skipped, 1746 assertions each), which is the point of the single
+release line: the same suite, the same percentages, two Filament majors. The
+`^4.0` lane resolves Filament 4.14.0 and the `^5.0` lane Filament 5.9.0; the
+hands-on browser pass in M6 was done on 4.11.6 and 5.9.0.
 
 Started at 83.3% and ended at 98.2% in eleven batches:
 
@@ -120,7 +122,7 @@ package claims to ship:
 | Dependency review | runtime: `php ^8.2`, `filament/filament ^4.0 \|\| ^5.0`, `spatie/laravel-package-tools ^1.16`; everything else is a dev dependency |
 | Static analysis | PHPStan level 5, no errors |
 | Code style | Pint clean on every commit in the branch |
-| Both lanes | 615 passed / 1 skipped / 1707 assertions on `^4.0` and `^5.0` |
+| Both lanes | 624 passed / 1 skipped / 1746 assertions on `^4.0` and `^5.0` |
 | Execution suite on real engines | MySQL 8.0 and PostgreSQL 15, all green |
 | Concurrency suite | 7 passed across both engines |
 | Benchmark | recorded in `docs/testing.md`, with the M4 numbers alongside |

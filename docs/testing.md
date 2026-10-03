@@ -39,7 +39,7 @@ tested rather than assumed. See [ADR 0008](adr/0008-php-baseline-and-tooling.md)
   `build/logs/clover.xml`.
 - Target: **100% of reachable PHP lines in `src/`, on both Filament majors**,
   measured on the final full suite.
-- Measured at M7: **98.2%** with 615 passing tests, identical on both lanes.
+- Measured at M7: **98.2%** with 624 passing tests, identical on both lanes.
 
 Every line the suite does not execute is enumerated with the reason it cannot be
 reached in [`docs/m7-handover.md`](m7-handover.md#reviewed-coverage-exceptions).
