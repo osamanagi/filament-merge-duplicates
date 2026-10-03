@@ -419,6 +419,8 @@ are different abilities.
 
 Depth on every contract, DTO, event and error code:
 [docs/api-reference.md](docs/api-reference.md) and [docs/errors.md](docs/errors.md).
+Host writers and observers:
+[docs/integration.md](docs/integration.md).
 
 
 ## Requirements

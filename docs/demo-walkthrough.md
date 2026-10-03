@@ -80,6 +80,24 @@ differences noted at the end.
   `->viteTheme('resources/css/app.css')` plus `npm install && npm run build` fixes it.
 - The panel path is `/`, so the login page is `/login`, not `/admin/login`.
 
+## Seeded states
+
+`database/seeders/MergeDuplicatesDemoSeeder.php` in the Filament 5 demo produces every
+state the walkthrough has to show, so nothing is hand-edited before a review:
+
+| State | How it is produced | What the pages show |
+| --- | --- | --- |
+| Mergeable | Two customers with the same name and the same phone | Confirmation needs no choice and is enabled |
+| Conflicting choice | Two customers with the same name and different phones | The comparison requires a value for the phone |
+| Dismissed | A third pair, dismissed after the scan | The pair is absent from the list and stays absent after a rescan |
+| Blocked | Authors: the model is not soft-deletable, so the definition is detection-only | The comparison states that merging is not enabled and reports `invalid_configuration` |
+| Blank | Employees are scanned with no duplicate to find | The list reports an empty result with the scan time, not "never scanned" |
+
+The seeder scans through `filament-merge-duplicates:scan … --sync` with the same panel
+and actor the UI uses, because both are part of the scope identity. It is idempotent:
+rows are keyed on their unique column and the dismissed pair is dismissed again on every
+run.
+
 ## Observed results
 
 Filament 5.9.0 (`demo_merge`), definition `shop-customers`:

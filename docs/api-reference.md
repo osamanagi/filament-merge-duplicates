@@ -49,6 +49,10 @@ blockers stop merging, detection keeps working.
 
 ## Host contracts
 
+The behavioural half of these contracts - what a host writer and an observer have to
+do, and what the package guarantees in return - is in
+[docs/integration.md](docs/integration.md).
+
 | Contract | Methods | What an implementation has to guarantee |
 | --- | --- | --- |
 | `ContextResolver` | `actorRef()`, `panelId()`, `tenant()`, `contextFor(definitionId, connection, scopeHash)` | Returns primitives only, and throws `MissingContext` instead of guessing. The result is persisted with a queued scan and re-established by the worker. |
