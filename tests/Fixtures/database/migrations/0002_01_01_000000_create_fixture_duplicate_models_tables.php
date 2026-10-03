@@ -18,6 +18,11 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();
+
+            // A table with an ordinary (non-unique) index as well as its
+            // unique ones: a scan of the indexes must not treat every index as
+            // a uniqueness constraint.
+            $table->index('tenant_id');
         });
 
         Schema::create('fixture_notes', function (Blueprint $table) {
@@ -31,6 +36,10 @@ return new class extends Migration
             // A composite unique index that two transferred children can
             // collide on, which the planner must block rather than resolve.
             $table->unique(['contact_id', 'body']);
+
+            // An ordinary index alongside it, so the collision scan has to skip
+            // a non-unique index rather than assume uniqueness.
+            $table->index('body');
         });
 
         Schema::create('fixture_inventory_items', function (Blueprint $table) {
