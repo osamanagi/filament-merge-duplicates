@@ -119,12 +119,12 @@
                     <dl class="grid gap-2 sm:grid-cols-2">
                         <div class="space-y-1">
                             <dt class="text-xs text-gray-500 dark:text-gray-400">{{ trans($translation . 'survivor_value', ['title' => $survivorTitle]) }}</dt>
-                            <dd class="break-words text-sm text-gray-950 dark:text-white">{{ $difference['survivorValue'] }}</dd>
+                            <dd class="fi-merge-value break-words text-sm text-gray-950 dark:text-white">{{ $difference['survivorValue'] }}</dd>
                         </div>
 
                         <div class="space-y-1">
                             <dt class="text-xs text-gray-500 dark:text-gray-400">{{ trans($translation . 'source_value', ['title' => $sourceTitle]) }}</dt>
-                            <dd class="break-words text-sm text-gray-950 dark:text-white">{{ $difference['sourceValue'] }}</dd>
+                            <dd class="fi-merge-value break-words text-sm text-gray-950 dark:text-white">{{ $difference['sourceValue'] }}</dd>
                         </div>
                     </dl>
 

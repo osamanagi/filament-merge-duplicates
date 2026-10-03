@@ -619,3 +619,41 @@ it('exposes no definitions on a panel that registers something else under the pl
     livewire(DuplicateReviewPage::class, ['definition' => 'fixture-review-conflict'])
         ->assertNotFound();
 });
+
+it('renders the Arabic catalogue when the panel locale is Arabic', function () {
+    $definition = reviewPageDefinition('fixture-review-arabic', titleAttribute: 'display_name');
+    reviewPagePanel(['fixture-review-arabic']);
+
+    $context = reviewPageContext($definition);
+    $generation = reviewPageGeneration($context);
+
+    $first = Contact::create(['tenant_id' => 'tenant-a', 'display_name' => 'First record', 'reference' => 'SAME']);
+    $second = Contact::create(['tenant_id' => 'tenant-a', 'display_name' => 'Second record', 'reference' => 'SAME']);
+
+    $digest = reviewPageDigest($definition, $first);
+
+    reviewPageMembership($context, (string) $first->getKey(), $generation, $digest);
+    reviewPageMembership($context, (string) $second->getKey(), $generation, $digest);
+
+    $englishHeading = trans('filament-merge-duplicates::merge-duplicates.review.heading', ['label' => 'Record']);
+
+    app()->setLocale('ar');
+
+    try {
+        // The expected strings are read from the Arabic catalogue rather than written
+        // here, so the test fails the moment a view stops translating and hardcodes
+        // English copy on the page.
+        $arabicHeading = trans('filament-merge-duplicates::merge-duplicates.review.heading', ['label' => 'Record']);
+        $arabicRecords = trans_choice('filament-merge-duplicates::merge-duplicates.review.records', 2, ['count' => 2]);
+
+        expect($arabicHeading)->not->toBe($englishHeading);
+
+        livewire(DuplicateReviewPage::class, ['definition' => 'fixture-review-arabic'])
+            ->assertOk()
+            ->assertSee($arabicHeading)
+            ->assertSee($arabicRecords)
+            ->assertDontSee($englishHeading);
+    } finally {
+        app()->setLocale('en');
+    }
+});

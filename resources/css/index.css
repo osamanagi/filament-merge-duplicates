@@ -32,3 +32,16 @@
         display: none;
     }
 }
+
+/*
+ * Record values are the user's data, not interface copy, so they must keep their
+ * own reading order when the panel runs in Arabic. Without isolation a phone
+ * number renders with its sign moved to the other end of the digits and `#1024`
+ * loses the position of its prefix. `plaintext` derives the direction from the
+ * value itself: an Arabic name stays right-to-left, a number stays left-to-right.
+ */
+.fi-merge-duplicates-review .fi-merge-value,
+.fi-merge-duplicates-merge .fi-merge-value,
+.fi-merge-duplicates-audit .fi-merge-value {
+    unicode-bidi: plaintext;
+}

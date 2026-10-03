@@ -172,6 +172,25 @@ function mergePreviewPair(): array
     return [$older, $newer];
 }
 
+/**
+ * Renders the comparison page for a freshly created pair and returns its markup,
+ * for the assertions that are about the rendered element tree rather than about
+ * the page's behaviour.
+ */
+function mergePreviewHtml(string $definitionId): string
+{
+    mergePreviewDefinition($definitionId, ['review', 'dismiss', 'merge']);
+    mergePreviewPanel([$definitionId]);
+
+    [$older, $newer] = mergePreviewPair();
+
+    return livewire(DuplicateMergePage::class, [
+        'definition' => $definitionId,
+        'first' => (string) $older->getKey(),
+        'second' => (string) $newer->getKey(),
+    ])->html();
+}
+
 it('renders the field comparison with both records and the recommendation', function () {
     mergePreviewDefinition('fixture-merge-page', ['review', 'dismiss', 'merge']);
     mergePreviewPanel(['fixture-merge-page']);
@@ -849,4 +868,59 @@ it('renders a boolean field as a word rather than as a number', function () {
         ->assertSee('true')
         ->assertSee('false')
         ->assertDontSee('>1<', false);
+});
+
+it('names every comparison control for assistive technology and keeps a focus indicator', function () {
+    $xpath = parseHtml(mergePreviewHtml('fixture-merge-accessible'));
+
+    $radios = xpathQuery($xpath, '//input[@type="radio"]');
+
+    expect($radios->length)->toBeGreaterThan(0);
+
+    $unnamed = [];
+    $ungrouped = [];
+
+    foreach ($radios as $radio) {
+        if (! $radio instanceof \DOMElement) {
+            continue;
+        }
+
+        // A control whose visible text is not its accessible name is unusable with
+        // a screen reader: either the label wraps it, or a label points at it.
+        $id = $radio->getAttribute('id');
+        $wrapped = xpathQuery($xpath, 'ancestor::label', $radio)->length > 0;
+        $pointed = $id !== '' && xpathQuery($xpath, '//label[@for="' . $id . '"]')->length > 0;
+
+        if (! $wrapped && ! $pointed) {
+            $unnamed[] = $radio->getAttribute('name') . '=' . $radio->getAttribute('value');
+        }
+
+        // The group of choices needs a name too, or the options are announced
+        // without saying what is being chosen.
+        $legend = xpathQuery($xpath, 'ancestor::fieldset/legend', $radio);
+        $legendText = $legend->length > 0 ? trim((string) $legend->item(0)?->textContent) : '';
+
+        if ($legendText === '') {
+            $ungrouped[] = $radio->getAttribute('name');
+        }
+    }
+
+    expect($unnamed)->toBe([])
+        ->and($ungrouped)->toBe([]);
+
+    // The indicator has to be on the control the keyboard lands on, not only on
+    // the row drawn around it.
+    expect(xpathQuery($xpath, '//input[@type="radio"][contains(@class, "focus-visible")]')->length)
+        ->toBe($radios->length);
+});
+
+it('isolates compared values so a number keeps its own reading order in a right-to-left panel', function () {
+    $xpath = parseHtml(mergePreviewHtml('fixture-merge-bidi'));
+
+    // The pair differs on the phone number, which is the case that renders with the
+    // sign moved to the other end of the digits when the value is not isolated from
+    // the paragraph direction. Every compared value carries the marker the
+    // stylesheet isolates, and no value is left unmarked.
+    expect(xpathQuery($xpath, '//dd[contains(@class, "fi-merge-value")]')->length)->toBeGreaterThanOrEqual(2)
+        ->and(xpathQuery($xpath, '//dd[not(contains(@class, "fi-merge-value"))]')->length)->toBe(0);
 });

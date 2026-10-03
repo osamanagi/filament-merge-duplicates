@@ -66,9 +66,9 @@
                     <ul class="space-y-2">
                         @foreach ($group->members as $member)
                             <li class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-950 dark:text-white">
-                                <span class="font-medium">{{ $member->title }}</span>
+                                <span class="fi-merge-value font-medium">{{ $member->title }}</span>
 
-                                <span class="text-xs text-gray-500 dark:text-gray-400">#{{ $member->recordId->value }}</span>
+                                <span class="fi-merge-value text-xs text-gray-500 dark:text-gray-400">#{{ $member->recordId->value }}</span>
 
                                 @if ($member->missing)
                                     <span class="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-white/10 dark:text-gray-300">

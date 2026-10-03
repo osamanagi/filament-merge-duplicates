@@ -152,6 +152,51 @@ Both installations rendered the pages with plain semantic markup and no
 major-specific view differences, which is the claim the single release line
 rests on.
 
+## RTL and keyboard pass
+
+The plan's U01 case was the last one still marked `partial`, so the mechanical part
+of both passes was done on Filament 5.9 and Filament 4.11 in the browser, with the
+package source loaded and the published demo copies refreshed first.
+
+What the pass confirmed, and now pins with tests:
+
+- The Arabic catalogue is complete and genuinely translated: the same 75 keys as
+  English, none of them a copy of the English value, and the review page renders
+  the Arabic strings when the locale is Arabic (`TranslationCatalogueTest`, and a
+  page test that reads its expected strings from the catalogue).
+- Nothing the package owns depends on writing direction: no view or stylesheet uses
+  a physical-direction token (`text-left`, `ml-`, `space-x-`, `margin-left`, and so
+  on), no view carries an inline style, and with `dir="rtl"` forced on the merged
+  region the comparison grid has no explicitly left- or right-aligned element.
+- Keyboard: every radio is named by its wrapping label, every choice group is named
+  by a `fieldset` legend, Tab walks survivor group → choice group → dismiss → back,
+  arrow keys move the selection inside a group and enable confirmation, and the
+  control being focused is the one that shows the indicator. The disabled confirm
+  button is correctly skipped until the choices are complete.
+
+What the pass found, and the fix:
+
+- **Record values were reordered by the interface direction.** In the Arabic
+  layout `+1-555-0199` rendered with the sign at the far end of the digits, and an
+  identifier such as `#1024` lost the position of its prefix. Values are the user's
+  data, not interface copy: they are now marked `fi-merge-value` and isolated with
+  `unicode-bidi: plaintext`, which derives the direction from the value itself, so
+  an Arabic name stays right to left and a number keeps its own order. The rule is
+  in `resources/css/index.css` **and** in the built
+  `resources/dist/filament-merge-duplicates.css`; a test asserts the built asset
+  carries it, because the panel loads the built file and a fix that is written but
+  never built reaches no installation.
+
+One trap is worth remembering for the next browser pass: **both demo applications
+publish the package views and stylesheet**, so they shadow the package source.
+Changing a view or the stylesheet without re-running `vendor:publish
+--tag=filament-merge-duplicates-views --force` and `filament:assets` means the
+browser is testing stale markup - which is exactly how the first RTL check looked
+like a failure that had no CSS behind it.
+
+What remains for a human: the judgement that the Arabic layout reads well, and the
+feel of the keyboard journey on a real device. U01 stays `partial` until then.
+
 ## Decisions taken in M7
 
 - **The coverage threshold is a floor, not a target.** The target stays 100% of

@@ -38,7 +38,7 @@
                     <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                         {{ $key }}
                     </dt>
-                    <dd class="whitespace-pre-wrap break-words text-sm text-gray-950 dark:text-white">{{ $this->formatValue($value) }}</dd>
+                    <dd class="fi-merge-value whitespace-pre-wrap break-words text-sm text-gray-950 dark:text-white">{{ $this->formatValue($value) }}</dd>
                 </div>
             @endforeach
         </dl>
