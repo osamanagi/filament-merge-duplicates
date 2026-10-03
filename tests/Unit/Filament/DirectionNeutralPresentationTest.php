@@ -20,15 +20,17 @@ function packagePresentationFile(string $relativePath): string
 }
 
 /**
- * Comments explain direction in prose, so they are removed before the scan: the
- * rule is about what the markup and the stylesheet do, not about the words used to
- * describe it.
+ * Comments explain direction in prose, and an icon name is an identifier rather
+ * than a style, so neither is scanned: the rule is about what the markup and the
+ * stylesheet do, not about the words used to describe it or the name of an icon
+ * (`heroicon-m-arrows-right-left` is not a left-to-right assumption).
  */
 function stripPresentationComments(string $contents): string
 {
     $withoutBlockComments = preg_replace('#/\*.*?\*/#s', '', $contents) ?? $contents;
+    $withoutBladeComments = preg_replace('#\{\{--.*?--\}\}#s', '', $withoutBlockComments) ?? $withoutBlockComments;
 
-    return preg_replace('#\{\{--.*?--\}\}#s', '', $withoutBlockComments) ?? $withoutBlockComments;
+    return preg_replace('/heroicon-[a-z0-9-]+/', '', $withoutBladeComments) ?? $withoutBladeComments;
 }
 
 it('styles with logical direction rather than left and right', function () {

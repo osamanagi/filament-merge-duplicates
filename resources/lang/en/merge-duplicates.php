@@ -107,6 +107,7 @@ return [
         'choose_for' => 'Choose a value for :label',
         'keep_survivor_value' => 'Keep the kept record\'s value',
         'take_source_value' => 'Take the other record\'s value',
+        'value_on' => 'Value on :title',
         'status_identical' => 'Identical',
         'status_different' => 'Different',
         'status_source_only' => 'Filled from the retired record',

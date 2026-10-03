@@ -86,6 +86,7 @@ return [
         'choose_for' => 'اختر قيمة للحقل :label',
         'keep_survivor_value' => 'الإبقاء على قيمة السجل المُبقى',
         'take_source_value' => 'أخذ قيمة السجل الآخر',
+        'value_on' => 'القيمة في :title',
         'status_identical' => 'متطابق',
         'status_different' => 'مختلف',
         'status_source_only' => 'يُملأ من السجل المُلغى',

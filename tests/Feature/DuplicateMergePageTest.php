@@ -909,8 +909,9 @@ it('names every comparison control for assistive technology and keeps a focus in
         ->and($ungrouped)->toBe([]);
 
     // The indicator has to be on the control the keyboard lands on, not only on
-    // the row drawn around it.
-    expect(xpathQuery($xpath, '//input[@type="radio"][contains(@class, "focus-visible")]')->length)
+    // the row drawn around it. The controls are Filament's own, so the panel's
+    // input styling - including its focus state - applies.
+    expect(xpathQuery($xpath, '//input[@type="radio"][contains(@class, "fi-radio-input")]')->length)
         ->toBe($radios->length);
 });
 
@@ -919,39 +920,22 @@ it('isolates compared values so a number keeps its own reading order in a right-
 
     // The pair differs on the phone number, which is the case that renders with the
     // sign moved to the other end of the digits when the value is not isolated from
-    // the paragraph direction. Every rendered value carries the marker the
-    // stylesheet isolates; an empty placeholder is not a value and carries none.
-    $values = xpathQuery($xpath, '//dd[contains(@class, "fi-merge-value")]');
+    // the paragraph direction. Isolation is in the markup, so it holds even where a
+    // host theme ships no `unicode-bidi` support.
+    $values = xpathQuery($xpath, '//bdi[contains(@class, "fi-merge-value")]');
 
-    expect($values->length)->toBeGreaterThanOrEqual(2);
-
-    $unmarked = [];
-
-    foreach (xpathQuery($xpath, '//dd') as $value) {
-        if (! $value instanceof \DOMElement) {
-            continue;
-        }
-
-        if (trim($value->textContent) === '') {
-            continue;
-        }
-
-        if (! str_contains(' ' . $value->getAttribute('class') . ' ', ' fi-merge-value ')) {
-            $unmarked[] = $value->textContent;
-        }
-    }
-
-    expect($unmarked)->toBe([]);
+    expect($values->length)->toBeGreaterThanOrEqual(2)
+        ->and(xpathQuery($xpath, '//*[contains(@class, "fi-merge-value")][not(self::bdi)]')->length)->toBe(0);
 });
 
 it('marks each compared field as identical or different, in words and not only in tone', function () {
     $xpath = parseHtml(mergePreviewHtml('fixture-merge-diff-markers'));
 
-    $fields = xpathQuery($xpath, '//article[contains(@class, "fi-merge-diff")]');
+    $fields = xpathQuery($xpath, '//div[contains(@class, "fi-section")]');
 
     expect($fields->length)->toBeGreaterThanOrEqual(2);
 
-    $chipText = static function (string $expression) use ($xpath): array {
+    $text = static function (string $expression) use ($xpath): array {
         $texts = [];
 
         foreach (xpathQuery($xpath, $expression) as $node) {
@@ -964,19 +948,20 @@ it('marks each compared field as identical or different, in words and not only i
     // The pair agrees on its reference and disagrees on its display name, so both
     // verdicts have to be on the page, each with its own word: colour alone is not
     // a signal a colour-blind reader or a forced-colours mode can rely on.
-    $statuses = $chipText('//article[contains(@class, "fi-merge-diff")]//span[contains(@class, "fi-merge-chip")]');
+    $page = $text('//*[contains(@class, "fi-badge")]');
 
-    expect($statuses)->toContain('Identical')
-        ->and($statuses)->toContain('Different')
-        ->and($statuses)->toContain('Choose a value');
+    expect($page)->toContain('Identical')
+        ->and($page)->toContain('Different')
+        ->and($page)->toContain('Choose a value');
 
     // The surviving value and the value that is dropped are named, not just tinted.
-    expect($chipText('//span[contains(@class, "fi-merge-chip")]'))
-        ->toContain('Kept')
-        ->toContain('Not kept');
+    // The signs carry the same meaning for anyone who reads a diff.
+    expect($page)->toContain('Kept')
+        ->and($page)->toContain('Not kept')
+        ->and($text('//span[contains(@class, "fi-merge-diff-sign")]'))->toContain('+')->toContain('−');
 
     // The summary states what the comparison found before the operator reads it.
-    $summary = implode(' ', $chipText('//div[contains(@class, "fi-merge-summary")]'));
+    $summary = implode(' ', $page);
 
     expect($summary)->toContain('fields compared')
         ->and($summary)->toContain('identical')

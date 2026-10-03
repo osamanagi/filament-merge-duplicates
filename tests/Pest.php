@@ -39,7 +39,13 @@ function parseHtml(string $html): DOMXPath
     $document = new DOMDocument;
 
     $previous = libxml_use_internal_errors(true);
-    $document->loadHTML('<!DOCTYPE html><html><body>' . $html . '</body></html>');
+
+    // libxml assumes ISO-8859-1 without a charset hint, which mangles every
+    // multi-byte character - including the diff signs and any Arabic text.
+    $document->loadHTML(
+        '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' . $html . '</body></html>',
+    );
+
     libxml_clear_errors();
     libxml_use_internal_errors($previous);
 

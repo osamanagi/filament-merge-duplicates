@@ -75,12 +75,14 @@ php artisan vendor:publish --tag="filament-merge-duplicates-migrations"
 php artisan migrate
 ```
 
-The package registers one stylesheet. It never resizes or re-colours your panel; it
-adds the four things a Filament theme does not guarantee: a visible focus fallback, a
-border that survives high-contrast mode, print behaviour, and isolation of record
-values from the interface direction, so `+1-555-0199` or `#1024` keeps its own reading
-order in an Arabic panel. If your app serves Filament's assets from
-`public/`, publish them as usual so the stylesheet is not a 404:
+The pages are built from Filament's own components - sections, badges, callouts,
+buttons, fieldsets and radio inputs - so the panel's padding, palette and dark mode
+apply everywhere. One package stylesheet then carries the comparison itself, which
+Filament has no component for: the value-by-value diff rows, the two record cards, a
+visible focus fallback, and isolation of record values from the interface direction,
+so `+1-555-0199` or `#1024` keeps its own reading order in an Arabic panel. If your
+app serves Filament's assets from `public/`, publish them as usual so the stylesheet
+is not a 404:
 
 ```bash
 php artisan filament:assets
