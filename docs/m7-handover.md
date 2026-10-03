@@ -170,15 +170,43 @@ rests on.
 
 ## Follow-ups recorded after the first green run
 
-Two CI annotations from the merge run are worth acting on before the next release,
-neither of them a gate item:
+Both CI annotations from the merge run are now closed; neither was a gate item, so
+they were fixed after the release gate rather than inside it.
 
-- `actions/upload-artifact` is pinned at v4.6.2, which targets Node 20; GitHub is
-  forcing it onto Node 24 with a deprecation warning. It still runs today, and
-  bumping the pin means a new SHA and a fresh CI run, so it is a separate change.
-- `ubuntu-latest` will point at Ubuntu 26 from 2026-10-19. The lanes use MySQL and
-  PostgreSQL service containers, so a pinned `ubuntu-24.04` (or a verified run on
-  26) is the safer choice for the next release.
+- `actions/upload-artifact` was pinned at v4.6.2, which targets Node 20. The pin is
+  now **v7.0.1** (`043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`), the current release,
+  which targets Node 24. The inputs used here (`name`, `path`,
+  `if-no-files-found`) are unchanged in v7, and Dependabot already watches
+  `github-actions` weekly, so this pin keeps moving on its own.
+- `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19. Every job in `tests.yml` is now
+  pinned to **`ubuntu-24.04`**, with the reason recorded in the workflow header:
+  the lane and coverage jobs provision MySQL 8 and PostgreSQL 15 service
+  containers and install PHP extensions, so the image is part of what was tested.
+  Moving the pin is a deliberate change with a green run, not something to inherit
+  on a release day. The documentation-only workflows (`zizmor`, `fix-code-style`,
+  `update-changelog`) stay on `ubuntu-latest` on purpose: they hold no service
+  containers, and they are the cheapest early warning if Ubuntu 26 does break
+  something.
+
+Validated by the `main` run that followed the change.
+
+### Formatter version drift, found on 2026-10-04
+
+A `style:` commit on `main` (`88c9137`) was undone by the `fix-code-style` workflow
+(`3089581`) because two formatters disagree about the same seven files. The pushed
+version had `static fn(mixed $name)` and `!$flag`; the repository's Pint wants
+`static fn (mixed $name)` and `! $flag`. The Pint job failed on `88c9137`, which is
+the only red run since the merge.
+
+Two traps came out of it, both worth remembering:
+
+- The auto-commit pushes with the default `GITHUB_TOKEN`, and GitHub does not start
+  workflow runs for those pushes. `main` therefore spent time with a tip
+  (`3089581`) that no run had ever tested; the next hand-made push is what validates
+  it. A green board does not prove the tip was tested.
+- A style disagreement should be settled by running `vendor/bin/pint` from this
+  repository, not an editor-bundled formatter. Compare `vendor/bin/pint --version`
+  with the version the editor uses before pushing a `style:` commit.
 
 ## Still open
 

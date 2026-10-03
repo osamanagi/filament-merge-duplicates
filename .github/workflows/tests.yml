@@ -1,5 +1,11 @@
 name: tests
 
+# The runner image is pinned on purpose: `ubuntu-latest` moves to Ubuntu 26 on
+# 2026-10-19, and every job here either provisions MySQL/PostgreSQL service
+# containers or installs PHP extensions, both of which are image-specific. Move
+# the pin deliberately, with a green run, rather than inheriting a new image on a
+# release day. See "Follow-ups" in `docs/m7-handover.md`.
+
 on:
   push:
     branches:
@@ -16,7 +22,7 @@ concurrency:
 jobs:
   lint:
     name: Pint and PHPStan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,7 +46,7 @@ jobs:
 
   tests:
     name: ${{ matrix.lane }} - PHP ${{ matrix.php }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     services:
       mysql:
@@ -137,7 +143,7 @@ jobs:
 
   resolve:
     name: Resolve ${{ matrix.constraint }} on PHP ${{ matrix.php }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # Proves the published "require" constraints install for both Filament
     # majors on the minimum supported PHP and on current PHP, independently of
@@ -166,7 +172,7 @@ jobs:
 
   coverage:
     name: Coverage gate (${{ matrix.lane }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # The M7 release gate is 100% of *reachable* `src/` lines. Every line the
     # suite does not execute is enumerated with its reason in
@@ -237,7 +243,7 @@ jobs:
 
       - name: Upload coverage reports
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-${{ matrix.lane }}
           path: |
