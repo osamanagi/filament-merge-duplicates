@@ -33,11 +33,30 @@ function stripPresentationComments(string $contents): string
 
 it('styles with logical direction rather than left and right', function () {
     $tokens = [
-        'text-left', 'text-right', 'float-left', 'float-right',
-        'ml-', 'mr-', 'pl-', 'pr-', 'left-', 'right-', 'space-x-',
-        'border-l-', 'border-r-', 'rounded-l-', 'rounded-r-',
-        'margin-left', 'margin-right', 'padding-left', 'padding-right',
-        'border-left', 'border-right', 'text-align', 'left:', 'right:',
+        'text-left',
+        'text-right',
+        'float-left',
+        'float-right',
+        'ml-',
+        'mr-',
+        'pl-',
+        'pr-',
+        'left-',
+        'right-',
+        'space-x-',
+        'border-l-',
+        'border-r-',
+        'rounded-l-',
+        'rounded-r-',
+        'margin-left',
+        'margin-right',
+        'padding-left',
+        'padding-right',
+        'border-left',
+        'border-right',
+        'text-align',
+        'left:',
+        'right:',
     ];
 
     $files = [
