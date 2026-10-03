@@ -113,14 +113,10 @@ final class RelationPlanBuilder
     private function childrenOf(Relation $relation, bool $includeSoftDeleted): Collection
     {
         if ($relation instanceof HasMany && $includeSoftDeleted && $this->relatedUsesSoftDeletes($relation)) {
-            // Soft-deleted children are included only when the definition
-            // declares their transfer, and are read through the same relation
-            // constraint so no child can be missed.
-            $query = $relation->getRelated()->newQueryWithoutScopes()
-                ->withoutGlobalScope(SoftDeletingScope::class)
-                ->where($relation->getForeignKeyName(), '=', $relation->getParentKey());
 
-            return $query->get();
+            return $relation->getQuery()
+                ->withoutGlobalScope(SoftDeletingScope::class)
+                ->get();
         }
 
         return $relation->get();

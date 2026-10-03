@@ -24,6 +24,31 @@ it('trims text without touching internal whitespace', function () {
     expect($normalised?->value)->toBe('Acme   Corp');
 });
 
+it('is idempotent: a normalised value normalises to itself', function () {
+    $normalizers = [
+        'identity' => new IdentityNormalizer,
+        'trimmed text' => new TrimmedTextNormalizer,
+        'lowercased text' => new TrimmedTextNormalizer(lowercase: true),
+        'email' => new EmailNormalizer,
+        'lowercased email' => new EmailNormalizer(lowercaseLocalPart: true),
+    ];
+
+    foreach ($normalizers as $label => $normalizer) {
+        $raw = $normalizer === $normalizers['email'] || $normalizer === $normalizers['lowercased email']
+            ? '  Ada@Example.COM  '
+            : '  Ada Lovelace  ';
+
+        $once = $normalizer->normalize($raw);
+        $twice = $once === null ? null : $normalizer->normalize($once->value);
+
+        // Feeding a normalised value back in must not change it again: a key is
+        // a function of the value, and two records that normalise alike have to
+        // produce the same key however many times either was normalised.
+        expect($twice)->toEqual($once, "The [{$label}] normalizer is not idempotent.")
+            ->and($normalizer->normalize($raw))->toEqual($once, "The [{$label}] normalizer is not deterministic.");
+    }
+});
+
 it('treats case as an explicit option that changes the version', function () {
     $plain = new TrimmedTextNormalizer;
     $lowercasing = new TrimmedTextNormalizer(lowercase: true);

@@ -75,7 +75,7 @@ do, and what the package guarantees in return - is in
 | `Authorization\NullContextResolver` | Fails closed; a definition that does not override the resolver cannot run unscoped. |
 | `Matching\ExactRule` | `ExactRule::make('name')->fields(['name'])->normalizeWith(TrimmedTextNormalizer::class, lowercase: true)->describedAs('Same name')`. Composite rules pass several field names. |
 | `Normalization\TrimmedTextNormalizer` | Trims; optionally lowercases. |
-| `Normalization\EmailNormalizer` | Trims and lowercases an email address. |
+| `Normalization\EmailNormalizer` | Trims, rejects a malformed address, lowercases the domain and lowercases the local part only when `lowercaseLocalPart: true` is passed. Plus tags and dots are never stripped. |
 | `Normalization\IdentityNormalizer` | Passes a value through as-is. |
 | `Definitions\MergeField` | `MergeField::make('phone')->label('Phone')`, plus `blankIsMissing()` and `audited(false)`. |
 | `Relations\LockingWriterGuard` | `WriterGuard` that refuses new children for a retired record. |

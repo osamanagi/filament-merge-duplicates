@@ -155,3 +155,135 @@ it('installs, enforces the terminal constraint, and rolls back', function (strin
             ->toBeTrue("[{$table}] was not reinstalled on {$engine}.");
     }
 })->with('engines');
+
+it('keeps existing package data when the migrations run again', function (string $engine) {
+    if (! probeReachable($engine)) {
+        test()->markTestSkipped("No {$engine} engine reachable for the migration test.");
+    }
+
+    $connection = probeConnection($engine);
+
+    Schema::connection($connection)->dropAllTables();
+
+    $migrate = [
+        '--path' => packageMigrationPath(),
+        '--realpath' => true,
+        '--database' => $connection,
+        '--force' => true,
+    ];
+
+    $this->artisan('migrate', $migrate)->assertSuccessful();
+
+    // One row of every shape an installed application would already hold: a
+    // published generation, its memberships, a dismissal, a live preview and a
+    // committed merge with its audit payload.
+    insertUpgradeFixtureRows($connection);
+
+    $before = snapshotPackageTables($connection);
+
+    // An upgrade re-runs the migrator. Nothing new has to be applied, and the
+    // existing rows - suggestions, dismissals, the retirement ledger and its
+    // audit payloads - must still be exactly what they were.
+    $this->artisan('migrate', $migrate)->assertSuccessful();
+
+    expect(snapshotPackageTables($connection))->toBe($before)
+        ->and($before['filament_merge_duplicates_memberships'])->toHaveCount(1)
+        ->and($before['filament_merge_duplicates_merges'])->toHaveCount(1);
+})->with('engines');
+
+/**
+ * @return array<string, list<array<string, mixed>>>
+ */
+function snapshotPackageTables(string $connection): array
+{
+    $snapshot = [];
+
+    foreach (PACKAGE_TABLES as $table) {
+        $snapshot[$table] = DB::connection($connection)
+            ->table($table)
+            ->orderBy(sortColumnFor($table))
+            ->get()
+            ->map(static fn (object $row): array => (array) $row)
+            ->all();
+    }
+
+    return $snapshot;
+}
+
+function sortColumnFor(string $table): string
+{
+    return $table === 'filament_merge_duplicates_memberships' ? 'id' : 'created_at';
+}
+
+function insertUpgradeFixtureRows(string $connection): void
+{
+    $scopeId = ledgerId('C001');
+
+    DB::connection($connection)->table('filament_merge_duplicates_scopes')->insert([
+        'id' => $scopeId,
+        'definition_id' => 'fixture-contacts',
+        'definition_revision' => '1',
+        'scope_hash' => str_repeat('b', 64),
+        'connection' => $connection,
+        'model_alias' => 'FixtureContact',
+        'current_generation_id' => ledgerId('C002'),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::connection($connection)->table('filament_merge_duplicates_scans')->insert([
+        'id' => ledgerId('C003'),
+        'scope_id' => $scopeId,
+        'generation_id' => ledgerId('C002'),
+        'config_revision' => '1',
+        'state' => 'succeeded',
+        'cursor' => '42',
+        'counters' => json_encode(['chunks' => 1, 'indexed' => 2]),
+        'failure_code' => null,
+        'heartbeat_at' => now(),
+        'started_at' => now(),
+        'finished_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::connection($connection)->table('filament_merge_duplicates_memberships')->insert([
+        'generation_id' => ledgerId('C002'),
+        'rule_id' => 'reference',
+        'digest' => str_repeat('c', 64),
+        'record_id' => '42',
+        'record_id_type' => 'int',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::connection($connection)->table('filament_merge_duplicates_dismissals')->insert([
+        'id' => ledgerId('C004'),
+        'scope_id' => $scopeId,
+        'pair_hash' => str_repeat('d', 64),
+        'record_ids' => json_encode(['int:42', 'int:43']),
+        'signatures' => json_encode(['low' => ['reference' => 'digest'], 'high' => ['reference' => 'digest']]),
+        'config_revision' => '1',
+        'definition_revision' => '1',
+        'actor_ref' => 'actor-1',
+        'reopened_at' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::connection($connection)->table('filament_merge_duplicates_previews')->insert([
+        'id' => ledgerId('C005'),
+        'operation_id' => ledgerId('C006'),
+        'scope_id' => $scopeId,
+        'definition_id' => 'fixture-contacts',
+        'panel_id' => 'admin',
+        'actor_ref' => 'actor-1',
+        'payload_hash' => str_repeat('e', 64),
+        'plan_payload' => 'encrypted-placeholder',
+        'expires_at' => now()->addMinutes(15),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    insertLedgerRow($connection, ledgerRow('42', '43'), ledgerId('C007'));
+}

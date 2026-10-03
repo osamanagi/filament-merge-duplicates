@@ -80,15 +80,15 @@ final class DefinitionRegistry
      */
     public function get(string $id): DuplicateDefinitionContract
     {
-        if (array_key_exists($id, $this->resolved)) {
-            return $this->resolved[$id];
-        }
-
-        if (! $this->has($id)) {
+        // Registration resolves the definition eagerly and fails on an incomplete
+        // one, so a registered ID always has an instance. An unregistered ID is
+        // therefore the only failure left here, and it fails with an explanation
+        // rather than a null.
+        if (! array_key_exists($id, $this->resolved)) {
             throw InvalidConfiguration::for($id, 'no definition is registered under this ID');
         }
 
-        return $this->resolved[$id] = $this->instantiate($this->sources[$id]);
+        return $this->resolved[$id];
     }
 
     /**

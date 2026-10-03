@@ -221,3 +221,9 @@ it('keeps the English and Arabic translation files in step', function () {
         ->and($flatten($english))->toContain('banner.results_title')
         ->and($flatten($english))->toContain('actions.review');
 });
+
+it('reports a failure label only for a scan that failed', function () {
+    expect(bannerFor(ReviewState::Empty)->failureLabel())->toBeNull()
+        ->and(bannerFor(ReviewState::Failed, failureCode: 'retry_exhausted')->failureLabel())
+        ->toContain('retry_exhausted');
+});

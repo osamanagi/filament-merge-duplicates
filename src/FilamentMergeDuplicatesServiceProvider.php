@@ -6,7 +6,6 @@ use Filament\Support\Assets\Asset;
 use Filament\Support\Assets\Css;
 use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentIcon;
-use Illuminate\Filesystem\Filesystem;
 use Livewire\Features\SupportTesting\Testable;
 use Nagi\FilamentMergeDuplicates\Commands\PruneDuplicatesCommand;
 use Nagi\FilamentMergeDuplicates\Commands\ScanDuplicatesCommand;
@@ -185,15 +184,6 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         // Icon Registration
         FilamentIcon::register($this->getIcons());
 
-        // Handle Stubs
-        if (app()->runningInConsole()) {
-            foreach (app(Filesystem::class)->files(__DIR__ . '/../stubs/') as $file) {
-                $this->publishes([
-                    $file->getRealPath() => base_path("stubs/filament-merge-duplicates/{$file->getFilename()}"),
-                ], 'filament-merge-duplicates-stubs');
-            }
-        }
-
         // Testing
         Testable::mixin(new TestsFilamentMergeDuplicates);
 
@@ -239,14 +229,6 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
      * @return array<string>
      */
     protected function getIcons(): array
-    {
-        return [];
-    }
-
-    /**
-     * @return array<string>
-     */
-    protected function getRoutes(): array
     {
         return [];
     }

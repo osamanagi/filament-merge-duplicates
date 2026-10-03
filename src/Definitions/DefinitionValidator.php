@@ -272,6 +272,17 @@ final class DefinitionValidator
         }
 
         $forbidden = $this->forbiddenFieldNames($definition, $model);
+
+        // Eloquent builds its cast map around one key name, so a model with a
+        // composite or unnamed key cannot be inspected at all. The identity check
+        // has already reported that as the problem, so the field checks stop here
+        // instead of turning a clear blocker into a runtime error.
+        $keyName = $model->getKeyName();
+
+        if (! is_string($keyName) || $keyName === '') {
+            return;
+        }
+
         $casts = $model->getCasts();
         $seen = [];
 
@@ -428,6 +439,21 @@ final class DefinitionValidator
 
                 if (! $resolved instanceof Relation) {
                     $issues[] = ConfigurationIssue::blocker('invalid_configuration', "The declared relation [{$name}] is not an Eloquent relation.", "relations.{$name}");
+
+                    continue;
+                }
+
+                $relatedConnection = $resolved->getRelated()->getConnectionName()
+                    ?? (string) config('database.default');
+
+                if ($relatedConnection !== $definition->connection()) {
+                    $relatedClass = $resolved->getRelated()::class;
+
+                    $issues[] = ConfigurationIssue::blocker(
+                        'invalid_configuration',
+                        "The relation [{$name}] targets [{$relatedClass}] on connection [{$relatedConnection}] while the definition runs on [{$definition->connection()}]. Cross-connection merges are unsupported, because the child writes could not be rolled back with the rest of the merge.",
+                        "relations.{$name}",
+                    );
                 }
             } catch (Throwable $exception) {
                 $issues[] = ConfigurationIssue::blocker(
@@ -537,7 +563,15 @@ final class DefinitionValidator
             (array) config('merge-duplicates.forbidden_field_names', []),
         )));
 
-        $forbidden[] = $model->getKeyName();
+        // A model with a composite or unnamed key is refused elsewhere; the key
+        // name is skipped here rather than turned into a string, because turning
+        // an array into a string would fail the whole validation instead of
+        // reporting the one problem the definition has.
+        $keyName = $model->getKeyName();
+
+        if (is_string($keyName) && $keyName !== '') {
+            $forbidden[] = $keyName;
+        }
 
         foreach ([$model->getCreatedAtColumn(), $model->getUpdatedAtColumn()] as $column) {
             if (is_string($column) && $column !== '') {
