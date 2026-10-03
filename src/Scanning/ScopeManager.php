@@ -9,7 +9,6 @@ use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Data\ScopeHasher;
 use Nagi\FilamentMergeDuplicates\Data\ScopeIdentity;
 use Nagi\FilamentMergeDuplicates\Models\ScopeRecord;
-use Throwable;
 
 /**
  * Derives and persists the canonical data scope.
@@ -78,8 +77,6 @@ final class ScopeManager
             // Two workers raced to create the same scope; the index is the
             // authority, so re-read the winning row.
             return ScopeRecord::on($context->connection)->where($attributes)->firstOrFail();
-        } catch (Throwable $exception) {
-            throw $exception;
         }
     }
 }

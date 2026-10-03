@@ -6,10 +6,12 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
+use Nagi\FilamentMergeDuplicates\Authorization\NullContextResolver;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
 use Nagi\FilamentMergeDuplicates\Definitions\MergeField;
+use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
 use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateAuditPage;
 use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateMergePage;
 use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateReviewPage;
@@ -535,4 +537,113 @@ it('escapes audit values instead of rendering them', function () {
         ->assertOk()
         ->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', escape: false)
         ->assertDontSee('<script>alert(1)</script>', escape: false);
+});
+
+/*
+|--------------------------------------------------------------------------
+| The audit page's refusals
+|--------------------------------------------------------------------------
+|
+| Four ways to refuse and one way to admit a payload cannot be read. The last one
+| matters most: an empty history would tell a reviewer that nothing happened when a
+| merge may have been committed.
+*/
+
+it('refuses an audit entry for a definition the panel does not expose', function () {
+    mergePreviewDefinition('fixture-audit-hidden', ['review', 'merge', 'view-audit']);
+    mergePreviewPanel(['fixture-audit-another']);
+
+    livewire(DuplicateAuditPage::class, [
+        'definition' => 'fixture-audit-hidden',
+        'operation' => (string) Str::ulid(),
+    ])->assertNotFound();
+});
+
+it('reports an operation it does not know as not found', function () {
+    mergePreviewDefinition('fixture-audit-unknown', ['review', 'merge', 'view-audit']);
+    mergePreviewPanel(['fixture-audit-unknown']);
+
+    livewire(DuplicateAuditPage::class, [
+        'definition' => 'fixture-audit-unknown',
+        'operation' => (string) Str::ulid(),
+    ])->assertNotFound();
+});
+
+it('refuses the audit page when no trusted context can be resolved', function () {
+    $definition = new ConfigurableDefinition([
+        'id' => 'fixture-audit-unscoped',
+        'model' => Contact::class,
+        'contextResolver' => new NullContextResolver,
+        'authorizer' => new AbilityMapAuthorizer([Ability::ViewAudit]),
+    ]);
+
+    app(DefinitionRegistry::class)->register($definition);
+    mergePreviewPanel(['fixture-audit-unscoped']);
+
+    livewire(DuplicateAuditPage::class, [
+        'definition' => 'fixture-audit-unscoped',
+        'operation' => (string) Str::ulid(),
+    ])->assertForbidden();
+});
+
+it('reports an unreadable payload as a failure rather than an empty history', function () {
+    $definition = mergePreviewDefinition('fixture-audit-unreadable', ['review', 'merge', 'view-audit']);
+    mergePreviewPanel(['fixture-audit-unreadable']);
+
+    [$older, $newer] = mergePreviewPair();
+    $context = mergePreviewContext($definition);
+    $operationId = (string) Str::ulid();
+
+    $record = new MergeRecord;
+    $record->setConnection($context->connection);
+    $record->forceFill([
+        'operation_id' => $operationId,
+        'scope_id' => (string) mergePreviewScope($context)->id,
+        'retirement_domain' => app(RetirementResolver::class)->domainDigest(
+            $context->connection,
+            Contact::class,
+            $definition->ownershipDomain(),
+        ),
+        'source_id' => (string) $newer->getKey(),
+        'source_id_type' => 'int',
+        'survivor_id' => (string) $older->getKey(),
+        'survivor_id_type' => 'int',
+        'actor_ref' => 'actor-1',
+        'definition_revision' => '1',
+        // Not ciphertext: the shape of a payload written under another key.
+        'audit_payload' => 'not-a-ciphertext',
+        'committed_at' => now(),
+    ]);
+    $record->save();
+
+    $page = livewire(DuplicateAuditPage::class, [
+        'definition' => 'fixture-audit-unreadable',
+        'operation' => $operationId,
+    ])->assertOk();
+
+    expect($page->get('errorCode'))->toBe('domain_conflict');
+});
+
+it('needs a definition before it can be built', function () {
+    expect(fn () => (new DuplicateAuditPage)->duplicateDefinitionId())
+        ->toThrow(InvalidConfiguration::class);
+});
+
+it('formats a history value as plain text', function (mixed $value, string $expected) {
+    expect((new DuplicateAuditPage)->formatValue($value))->toBe($expected);
+})->with([
+    'null' => [null, ''],
+    'true' => [true, 'true'],
+    'false' => [false, 'false'],
+    'integer' => [42, '42'],
+    'string' => ['Ada', 'Ada'],
+    'array' => [['field' => 'name'], "{\n    \"field\": \"name\"\n}"],
+]);
+
+it('formats a value it cannot encode as nothing rather than as null', function () {
+    $audit = new DuplicateAuditPage;
+
+    // A resource cannot be JSON encoded; the page must show nothing instead of the
+    // word "null" or a warning.
+    expect($audit->formatValue(fopen('php://memory', 'r')))->toBe('');
 });

@@ -36,11 +36,30 @@ final class RecordId
      */
     public static function fromStored(RecordIdType $type, string $value): self
     {
-        if ($type === RecordIdType::Int && ! ctype_digit($value)) {
+        if ($type === RecordIdType::Int && ! self::isIntegerLiteral($value)) {
             throw new InvalidArgumentException("The stored value [{$value}] is not a valid integer key.");
         }
 
         return new self($type, $value);
+    }
+
+    /**
+     * Whether a stored value is an integer key.
+     *
+     * A leading minus is accepted because a signed bigint column can hold a negative
+     * primary key: `fromModel()` accepts one, so rejecting it here would mean an ID
+     * that can be written as a membership but never read back. A lone minus is not a
+     * number, and neither is anything with other characters in it.
+     */
+    private static function isIntegerLiteral(string $value): bool
+    {
+        if (! str_starts_with($value, '-')) {
+            return ctype_digit($value);
+        }
+
+        $digits = substr($value, 1);
+
+        return $digits !== '' && ctype_digit($digits);
     }
 
     public function equals(self $other): bool

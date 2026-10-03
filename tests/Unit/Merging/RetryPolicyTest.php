@@ -58,3 +58,23 @@ it('bounds the number of attempts it will make', function () {
         ->and((new RetryPolicy)->maxAttempts())->toBe(3)
         ->and((new RetryPolicy(0))->maxAttempts())->toBe(1);
 });
+
+it('never retries a failure with no driver detail at all', function () {
+    $previous = new PDOException('driver failure', 0);
+    $previous->errorInfo = null;
+
+    $exception = new QueryException(
+        'mysql',
+        'update "fixture_contacts" set "reference" = ?',
+        ['TWO'],
+        $previous,
+    );
+
+    expect((new RetryPolicy)->isRetryable($exception))->toBeFalse();
+});
+
+it('retries a deadlock number even when the state is not conclusive', function () {
+    // Some drivers report a generic state with the deadlock number; the number alone
+    // has to be enough, or a retry is lost.
+    expect((new RetryPolicy)->isRetryable(queryFailure(['HY000', 1213, 'Deadlock found'])))->toBeTrue();
+});
