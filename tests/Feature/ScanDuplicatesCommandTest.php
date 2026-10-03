@@ -136,3 +136,19 @@ it('reports a scan that could not finish, and records a sanitized code', functio
     expect($scan->state)->toBe(ScanState::Failed)
         ->and($scan->failure_code)->toBe('scan_failed');
 });
+
+it('refuses to scan without an explicit actor', function () {
+    Queue::fake();
+    registerCommandDefinition();
+
+    $arguments = scanCommandArguments();
+    unset($arguments['--actor']);
+
+    // A console command is not an implicit administrator: the credential has to
+    // be stated, because it ends up in the scan row and in the audit trail.
+    $this->artisan('filament-merge-duplicates:scan', $arguments)
+        ->expectsOutputToContain('An explicit --actor is required')
+        ->assertFailed();
+
+    expect(ScanRecord::on('testing')->count())->toBe(0);
+});

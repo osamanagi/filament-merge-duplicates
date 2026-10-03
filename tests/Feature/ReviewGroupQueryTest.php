@@ -14,12 +14,14 @@ use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
 use Nagi\FilamentMergeDuplicates\Models\ScanRecord;
 use Nagi\FilamentMergeDuplicates\Models\ScopeRecord;
 use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
+use Nagi\FilamentMergeDuplicates\Scanning\CandidateBucket;
 use Nagi\FilamentMergeDuplicates\Scanning\KeyBuilder;
 use Nagi\FilamentMergeDuplicates\Scanning\ReviewGroup;
 use Nagi\FilamentMergeDuplicates\Scanning\ReviewGroupQuery;
 use Nagi\FilamentMergeDuplicates\Scanning\ReviewMember;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanState;
 use Nagi\FilamentMergeDuplicates\Scanning\ScopeManager;
+use Nagi\FilamentMergeDuplicates\Scanning\SuggestionQuery;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Contact;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\ConfigurableDefinition;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\PanelContextResolver;
@@ -324,4 +326,35 @@ it('reports an empty list when nothing has been scanned', function () {
     expect($page['groups'])->toBe([])
         ->and($page['total'])->toBe(0)
         ->and($page['lastPage'])->toBe(1);
+});
+
+it('accepts a numeric record attribute as the member title', function () {
+    $definition = groupDefinition(['recordTitleAttribute' => 'id']);
+    $context = groupContext($definition);
+    $generation = publishedGeneration($context);
+
+    $first = Contact::create(['tenant_id' => 'tenant-a', 'display_name' => 'First record', 'reference' => 'SAME']);
+    $second = Contact::create(['tenant_id' => 'tenant-a', 'display_name' => 'Second record', 'reference' => 'SAME']);
+
+    $digest = digestFor($definition, $first);
+    membership($context, $first, $generation, $digest);
+    membership($context, $second, $generation, $digest);
+
+    $group = app(ReviewGroupQuery::class)->page($definition, $context)['groups'][0];
+
+    // The key is not a string, so the title falls back to its string form rather
+    // than to the "#id" placeholder.
+    expect(array_map(static fn ($member) => $member->title, $group->members))
+        ->toBe([(string) $first->getKey(), (string) $second->getKey()]);
+});
+
+it('reports no members for a bucket in a scope that has no published generation', function () {
+    $definition = groupDefinition();
+    $context = groupContext($definition);
+
+    // A bucket read before anything was scanned has no generation to read from.
+    $bucket = new CandidateBucket('reference', 'Reference', 'digest', 2);
+
+    expect(app(SuggestionQuery::class)->memberIds($definition, $context, $bucket, 3))->toBe([])
+        ->and(app(SuggestionQuery::class)->count($definition, $context))->toBe(0);
 });
