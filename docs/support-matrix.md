@@ -11,11 +11,17 @@ hands-on demo on both majors.
 | Item | v1.0 |
 | --- | --- |
 | PHP | 8.2+ |
-| Laravel | 12.x |
+| Laravel | 12.x verified. 13.x installs, because Filament 5 allows it, but it is not part of the v1.0 promise |
 | Filament | 4.x **and** 5.x, from one release line |
 | Livewire | 3.x on Filament 4, 4.x on Filament 5 (constrained by Filament) |
-| Laravel 11 / 13 | Not supported in the initial promise |
+| Laravel 11 | Not supported in the initial promise |
 | Filament 3 | Not supported |
+
+Resolution was re-checked for v1.0 on 2026-10-03 with `bin/resolve-lane.sh`: `^4.0`
+resolves to Filament 4.14.0 with Livewire 3.8.10, `^5.0` to Filament 5.9.0 with
+Livewire 4.4.7, and both pull Laravel 13.34.0 from Filament's own constraints. The
+tested lanes are the ones CI and `bin/lane-test.sh` pin, and the Laravel row above
+says which version that is: 12.x.
 
 PHP 8.2 supports both majors. One caveat is recorded here rather than hidden, because
 "installable" and "verified" are different claims:

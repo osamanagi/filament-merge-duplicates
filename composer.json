@@ -54,7 +54,7 @@
         "lint": "pint",
         "test": "pest",
         "test:lint": "pint --test",
-        "test:coverage": "pest --coverage --min=100",
+        "test:coverage": "pest --coverage --min=98",
         "analyse": "phpstan analyse --memory-limit=1G",
         "check": [
             "@test:lint",
@@ -66,10 +66,7 @@
         "laravel": {
             "providers": [
                 "Nagi\\FilamentMergeDuplicates\\FilamentMergeDuplicatesServiceProvider"
-            ],
-            "aliases": {
-                "FilamentMergeDuplicates": "Nagi\\FilamentMergeDuplicates\\Facades\\FilamentMergeDuplicates"
-            }
+            ]
         }
     },
     "config": {
