@@ -70,7 +70,7 @@ function mergePreviewDefinition(string $id, array $abilities, array $overrides =
         'retirementStrategy' => new SoftDeleteRetirementStrategy,
         'writerGuard' => new RecordingWriterGuard,
         'authorizer' => new AbilityMapAuthorizer(
-            array_map(static fn(string $ability): Ability => Ability::from($ability), $abilities),
+            array_map(static fn (string $ability): Ability => Ability::from($ability), $abilities),
             'actor-1',
         ),
         ...$overrides,
@@ -628,7 +628,7 @@ it('reports an unreadable payload as a failure rather than an empty history', fu
 });
 
 it('needs a definition before it can be built', function () {
-    expect(fn() => (new DuplicateAuditPage)->duplicateDefinitionId())
+    expect(fn () => (new DuplicateAuditPage)->duplicateDefinitionId())
         ->toThrow(InvalidConfiguration::class);
 });
 

@@ -75,7 +75,7 @@ final class RelationPlanBuilder
 
             $children = $this->childrenOf($relation, $strategy->includesSoftDeletedChildren());
             $ids = $children
-                ->map(static fn(Model $child): string => RecordId::fromModel($child)->encode())
+                ->map(static fn (Model $child): string => RecordId::fromModel($child)->encode())
                 ->values()
                 ->all();
 
@@ -224,7 +224,7 @@ final class RelationPlanBuilder
                 $values = $this->valuesOf($child, $others);
 
                 $exists = $survivor->{$relationName}()->get()->contains(
-                    static fn(Model $existing): bool => self::valuesMatch($existing, $others, $values),
+                    static fn (Model $existing): bool => self::valuesMatch($existing, $others, $values),
                 );
 
                 if ($exists) {
@@ -243,7 +243,7 @@ final class RelationPlanBuilder
     private function keyOf(Model $child, array $columns): string
     {
         return implode("\x1f", array_map(
-            static fn(string $column): string => (string) $child->getAttribute($column),
+            static fn (string $column): string => (string) $child->getAttribute($column),
             $columns,
         ));
     }

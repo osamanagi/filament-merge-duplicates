@@ -559,7 +559,7 @@ final class DefinitionValidator
     private function forbiddenFieldNames(DuplicateDefinitionContract $definition, Model $model): array
     {
         $forbidden = array_values(array_unique(array_map(
-            static fn(mixed $name): string => (string) $name,
+            static fn (mixed $name): string => (string) $name,
             (array) config('merge-duplicates.forbidden_field_names', []),
         )));
 

@@ -102,7 +102,7 @@ it('refuses to execute a preview that reported a reason the pair cannot be merge
 
     expect($plan->isConfirmable())->toBeFalse();
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId, []))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId, []))
         ->toThrow(DomainConflict::class);
 
     $source->refresh();
@@ -149,11 +149,11 @@ it('refuses a declared relation that is not an ordinary has-many relation', func
     // A declared name that is not a method at all, and a name that is a method
     // but not an ordinary has-many relation: both are refused rather than
     // guessed, and nothing is written.
-    expect(fn() => $transfer->inventory($definition, new CompleteHasMany('missing'), $source))
+    expect(fn () => $transfer->inventory($definition, new CompleteHasMany('missing'), $source))
         ->toThrow(UnsupportedRelation::class)
-        ->and(fn() => $transfer->inventory($definition, new CompleteHasMany('getKey'), $source))
+        ->and(fn () => $transfer->inventory($definition, new CompleteHasMany('getKey'), $source))
         ->toThrow(UnsupportedRelation::class)
-        ->and(fn() => $transfer->transfer(new CompleteHasMany('missing'), $survivor, $source))
+        ->and(fn () => $transfer->transfer(new CompleteHasMany('missing'), $survivor, $source))
         ->toThrow(UnsupportedRelation::class);
 
     expect(Contact::query()->whereKey($survivor->getKey())->exists())->toBeTrue();
@@ -189,7 +189,7 @@ it('refuses to resolve a retired record for an actor without the review ability'
         ]),
     ]);
 
-    expect(fn() => app(SurvivorResolver::class)->resolve(
+    expect(fn () => app(SurvivorResolver::class)->resolve(
         $context,
         $ungranted,
         RecordId::fromModel($source),
@@ -212,7 +212,7 @@ it('refuses to resolve into a record outside the acting scope', function (string
 
     // The chain ends on the survivor, which tenant-b may not see, so the
     // resolver reports unavailability instead of leaking the record.
-    expect(fn() => app(SurvivorResolver::class)->resolve(
+    expect(fn () => app(SurvivorResolver::class)->resolve(
         $otherTenant,
         $definition,
         RecordId::fromModel($source),
@@ -274,7 +274,7 @@ it('rolls back when a host observer reverts a written field', function (string $
         }
     });
 
-    expect(fn() => app(MergeExecutor::class)->execute(
+    expect(fn () => app(MergeExecutor::class)->execute(
         $context,
         $definition,
         $plan->operationId,
@@ -312,7 +312,7 @@ it('counts only the children the transfer will actually move', function (string 
     // what the transfer will move, or the preview would offer a merge it can never
     // finish: the executor would abort with "the children changed while the merge
     // was running" instead of never offering it.
-    Note::addGlobalScope('host-scope', static fn(Builder $query): Builder => $query->where('body', '!=', 'hidden'));
+    Note::addGlobalScope('host-scope', static fn (Builder $query): Builder => $query->where('body', '!=', 'hidden'));
 
     $plan = $this->planFor($context, $definition, $survivor, $source);
 
@@ -353,7 +353,7 @@ it('rolls back when a host observer performs a write the database refuses', func
         ]);
     });
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(QueryException::class);
 
     Note::flushEventListeners();
@@ -365,7 +365,7 @@ it('rolls back when a host observer performs a write the database refuses', func
 
     Event::assertDispatched(
         MergeFailed::class,
-        fn(MergeFailed $event): bool => $event->operationId === $plan->operationId
+        fn (MergeFailed $event): bool => $event->operationId === $plan->operationId
             && $event->errorCode === 'unexpected_error',
     );
 })->with('engines');
@@ -391,7 +391,7 @@ it('rolls back when a child does not stay with the survivor', function (string $
             ->update(['contact_id' => $source->getKey()]);
     });
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(function (DomainConflict $exception): void {
             expect($exception->getMessage())->toContain('still points at the retired source');
         });

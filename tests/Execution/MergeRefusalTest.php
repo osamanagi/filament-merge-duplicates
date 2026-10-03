@@ -29,7 +29,7 @@ it('refuses to execute a merge on an engine that cannot make it atomic', functio
     $definition = $this->makeDefinition();
     $context = $this->contextFor($definition);
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, 'not-a-preview'))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, 'not-a-preview'))
         ->toThrow(InvalidConfiguration::class);
 });
 
@@ -62,7 +62,7 @@ it('refuses a definition whose model lives on another connection', function (str
     // apart, so the merge could not be rolled back as one unit.
     config(['database.default' => "{$engine}_writer"]);
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, 'not-a-preview'))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, 'not-a-preview'))
         ->toThrow(InvalidConfiguration::class);
 })->with('engines');
 
@@ -85,7 +85,7 @@ it('refuses a preview that belongs to another definition', function (string $eng
 
     $other = $this->makeDefinition(['id' => 'fixture-other-contacts']);
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $other, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $other, $plan->operationId))
         ->toThrow(function (ForbiddenOperation $exception): void {
             expect($exception->getMessage())->toContain('different duplicate definition');
         });
@@ -98,7 +98,7 @@ it('refuses a preview whose scope row is gone', function (string $engine) {
 
     DB::connection($engine)->table('filament_merge_duplicates_scopes')->delete();
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(function (RecordUnavailable $exception): void {
             expect($exception->getMessage())->toContain('data scope for this merge no longer exists');
         });
@@ -115,7 +115,7 @@ it('refuses a source the actor can no longer see', function (string $engine) {
         ->where('id', $source->getKey())
         ->update(['tenant_id' => 'tenant-b']);
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(function (RecordUnavailable $exception): void {
             expect($exception->getMessage())->toContain('no longer available to the acting user');
         });
@@ -130,7 +130,7 @@ it('refuses a preview that would merge a record into itself', function (string $
     // source, which the executor must catch rather than write.
     $this->replaceStoredPlan($engine, $plan, $plan->withChoices($plan->sourceId, $plan->sourceId, $plan->differences));
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(function (RecordUnavailable $exception): void {
             expect($exception->getMessage())->toContain('merged into itself');
         });
@@ -150,7 +150,7 @@ it('refuses a preview whose survivor is not the record that was reviewed', funct
         $plan->differences,
     ));
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(function (ForbiddenOperation $exception): void {
             expect($exception->getMessage())->toContain('not the record that was reviewed');
         });
@@ -166,7 +166,7 @@ it('refuses when the actor loses the merge ability after the preview', function 
     // merge rather than be remembered.
     $revoking = $this->makeDefinition(['authorizer' => new RevokedAfterChecks]);
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $revoking, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $revoking, $plan->operationId))
         ->toThrow(function (ForbiddenOperation $exception): void {
             expect($exception->getMessage())->toContain('may no longer merge records');
         });
@@ -181,7 +181,7 @@ it('refuses a source that was deleted after the preview', function (string $engi
 
     // The source has left the mergeable set, so it is refused as unavailable
     // rather than written to.
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(function (RecordUnavailable $exception): void {
             expect($exception->getMessage())->toContain('no longer available');
         });
@@ -194,7 +194,7 @@ it('refuses a source that an earlier merge already retired', function (string $e
 
     $this->retireInLedger($engine, $definition, $source);
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(function (RecordUnavailable $exception): void {
             expect($exception->getMessage())->toContain('already retired by an earlier merge');
         });
@@ -207,7 +207,7 @@ it('refuses a survivor that was itself retired', function (string $engine) {
 
     $this->retireInLedger($engine, $definition, $survivor);
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(function (RecordUnavailable $exception): void {
             expect($exception->getMessage())->toContain('survivor record is itself retired');
         });
@@ -220,7 +220,7 @@ it('refuses a choice for a field this merge cannot choose', function (string $en
 
     // The pair has no differing values at all, so nothing may be chosen - and a
     // field that is not part of the plan cannot be smuggled in.
-    expect(fn() => app(MergeExecutor::class)->execute(
+    expect(fn () => app(MergeExecutor::class)->execute(
         $context,
         $definition,
         $plan->operationId,
@@ -242,7 +242,7 @@ it('refuses an invalid choice value', function (string $engine) {
     // confirmable and the field is still choosable.
     $plan = $this->planFor($context, $definition, $survivor, $source);
 
-    expect(fn() => app(MergeExecutor::class)->execute(
+    expect(fn () => app(MergeExecutor::class)->execute(
         $context,
         $definition,
         $plan->operationId,
@@ -262,7 +262,7 @@ it('refuses to run when a field that needs a choice has none', function (string 
 
     $plan = $this->planFor($context, $definition, $survivor, $source);
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(function (DomainConflict $exception): void {
             expect($exception->getMessage())->toContain('an explicit choice is required');
         });
@@ -314,7 +314,7 @@ it('refuses a replay whose operation belongs to another scope', function (string
     // not this scope's history, so it is refused rather than disclosed.
     $otherScope = $this->contextFor($definition, 'actor-1', 'tenant-b');
 
-    expect(fn() => app(MergeExecutor::class)->execute($otherScope, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($otherScope, $definition, $plan->operationId))
         ->toThrow(function (ForbiddenOperation $exception): void {
             expect($exception->getMessage())->toContain('different scope');
         });
@@ -380,7 +380,7 @@ it('refuses a replay confirmed with choices the committed operation did not use'
         'relations' => [],
     ]);
 
-    expect(fn() => app(MergeExecutor::class)->execute(
+    expect(fn () => app(MergeExecutor::class)->execute(
         $context,
         $definition,
         $plan->operationId,
@@ -425,7 +425,7 @@ it('refuses a preview built under another definition revision', function (string
     // executed against the new one, and nothing is written.
     $revised = $this->makeDefinition(['revision' => '2']);
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $revised, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $revised, $plan->operationId))
         ->toThrow(MergeDuplicatesException::class);
 
     expect(MergeRecord::on($engine)->count())->toBe(0);
@@ -447,7 +447,7 @@ it('refuses a merge whose declared children changed after the preview', function
         'relations' => [],
     ]);
 
-    expect(fn() => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
         ->toThrow(function (StalePreview $exception): void {
             expect($exception->getMessage())->toContain('The children of [childNotes] changed after the preview');
         });
