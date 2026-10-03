@@ -16,6 +16,11 @@ return new class extends Migration
             $table->string('email')->nullable();
             $table->string('display_name')->nullable();
             $table->text('notes')->nullable();
+
+            // A JSON column with no cast: a field stored here cannot be merged
+            // by comparison, whichever way it was declared.
+            $table->json('payload')->nullable();
+
             $table->timestamps();
             $table->softDeletes();
 

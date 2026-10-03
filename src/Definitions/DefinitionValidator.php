@@ -272,6 +272,17 @@ final class DefinitionValidator
         }
 
         $forbidden = $this->forbiddenFieldNames($definition, $model);
+
+        // Eloquent builds its cast map around one key name, so a model with a
+        // composite or unnamed key cannot be inspected at all. The identity check
+        // has already reported that as the problem, so the field checks stop here
+        // instead of turning a clear blocker into a runtime error.
+        $keyName = $model->getKeyName();
+
+        if (! is_string($keyName) || $keyName === '') {
+            return;
+        }
+
         $casts = $model->getCasts();
         $seen = [];
 
@@ -537,7 +548,15 @@ final class DefinitionValidator
             (array) config('merge-duplicates.forbidden_field_names', []),
         )));
 
-        $forbidden[] = $model->getKeyName();
+        // A model with a composite or unnamed key is refused elsewhere; the key
+        // name is skipped here rather than turned into a string, because turning
+        // an array into a string would fail the whole validation instead of
+        // reporting the one problem the definition has.
+        $keyName = $model->getKeyName();
+
+        if (is_string($keyName) && $keyName !== '') {
+            $forbidden[] = $keyName;
+        }
 
         foreach ([$model->getCreatedAtColumn(), $model->getUpdatedAtColumn()] as $column) {
             if (is_string($column) && $column !== '') {

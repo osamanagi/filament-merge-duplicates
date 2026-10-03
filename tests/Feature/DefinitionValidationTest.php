@@ -5,6 +5,7 @@ use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
 use Nagi\FilamentMergeDuplicates\Authorization\DenyAllMergeAuthorizer;
 use Nagi\FilamentMergeDuplicates\Authorization\NullContextResolver;
 use Nagi\FilamentMergeDuplicates\Contracts\ContextResolver;
+use Nagi\FilamentMergeDuplicates\Contracts\MatchingRule;
 use Nagi\FilamentMergeDuplicates\Contracts\MergeAuthorizer;
 use Nagi\FilamentMergeDuplicates\Contracts\RelationStrategy;
 use Nagi\FilamentMergeDuplicates\Contracts\ScopedRecordQuery;
@@ -19,6 +20,7 @@ use Nagi\FilamentMergeDuplicates\Matching\ExactRule;
 use Nagi\FilamentMergeDuplicates\Relations\RelationType;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Definitions\ContactDuplicates;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Definitions\InventoryItemDuplicates;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\CompositeKeyRecord;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Contact;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\InventoryItem;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\CompleteHasMany;
@@ -558,4 +560,133 @@ it('never infers merge permission from review permission', function () {
     $authorizer = new AbilityMapAuthorizer([Ability::Review, Ability::Scan, Ability::Dismiss], 'actor-1');
 
     expect($authorizer->allows(duplicateContext(), Ability::Merge))->toBeFalse();
+});
+
+/*
+|--------------------------------------------------------------------------
+| Declarations the package cannot read at all
+|--------------------------------------------------------------------------
+|
+| These are the shapes a host can produce without meaning to: a model that does
+| not fit the portable key model, a rule that cannot be signed, a column the
+| schema stores as a document, and a relation whose accessor throws. Each one is
+| reported as a blocker with a path, never as an exception.
+*/
+
+it('blocks a model with a composite primary key', function () {
+    $report = validateDefinition(mergeReadyConfig(['model' => CompositeKeyRecord::class]));
+
+    expect(blockerMessages($report))->toContain('composite or unnamed primary keys')
+        ->and($report->hasBlockers())->toBeTrue();
+});
+
+it('blocks a matching rule that cannot be signed', function () {
+    $rule = Mockery::mock(MatchingRule::class);
+    $rule->shouldReceive('id')->andReturn('unstable');
+    $rule->shouldReceive('fieldNames')->andReturn(['reference']);
+    $rule->shouldReceive('signature')->andThrow(new RuntimeException('no stable signature'));
+
+    $report = validateDefinition(mergeReadyConfig(['matchingRules' => [$rule]]));
+
+    expect(blockerMessages($report))->toContain('cannot be signed')
+        ->and(blockerMessages($report))->toContain('no stable signature')
+        ->and(array_map(static fn ($issue) => $issue->path, $report->blockers()))
+        ->toContain('matchingRules.unstable');
+});
+
+it('blocks a relation that declares an unknown relation type', function () {
+    $relation = Mockery::mock(RelationStrategy::class);
+    $relation->shouldReceive('name')->andReturn('childNotes');
+    $relation->shouldReceive('type')->andReturn('not-a-relation-type');
+    $relation->shouldReceive('ownsCompleteInventory')->andReturn(true);
+    $relation->shouldReceive('includesSoftDeletedChildren')->andReturn(false);
+    $relation->shouldReceive('signature')->andReturn('child-notes');
+
+    $report = validateDefinition(mergeReadyConfig(['relations' => [$relation]]));
+
+    expect(blockerMessages($report))->toContain('unknown relation type');
+});
+
+it('blocks a relation whose accessor cannot be resolved', function () {
+    $report = validateDefinition(mergeReadyConfig([
+        'relations' => [new CompleteHasMany('getAttribute')],
+    ]));
+
+    expect(blockerMessages($report))->toContain('could not be resolved');
+});
+
+it('blocks a retirement strategy that needs soft deletes the model does not have', function () {
+    // Everything else about this definition is valid, so the only thing left to
+    // report is the mismatch between the strategy and the model.
+    $report = validateDefinition(mergeReadyConfig([
+        'id' => 'fixture-inventory-items',
+        'model' => InventoryItem::class,
+        'scopeKeys' => ['tenant_id'],
+        'matchingRules' => [ExactRule::make('sku')->fields(['sku'])],
+        'fields' => [MergeField::make('sku')],
+        'retirementStrategy' => new SoftDeleteRetirementStrategy,
+    ]));
+
+    expect(blockerMessages($report))->toContain('requires soft deletes');
+});
+
+it('blocks a definition whose connection cannot be read', function () {
+    $definition = new class extends BaseDefinition
+    {
+        public function id(): string
+        {
+            return 'fixture-unreadable-connection';
+        }
+
+        public function model(): string
+        {
+            return Contact::class;
+        }
+
+        public function label(): string
+        {
+            return 'Contact';
+        }
+
+        public function ownershipDomain(): string
+        {
+            return 'fixture';
+        }
+
+        public function matchingRules(): array
+        {
+            return [ExactRule::make('reference')->fields(['reference'])];
+        }
+
+        public function fields(): array
+        {
+            return [];
+        }
+
+        public function contextResolver(): ContextResolver
+        {
+            return $this->nullContextResolver();
+        }
+
+        public function scopedRecordQuery(): ScopedRecordQuery
+        {
+            return new TenantScopedRecordQuery;
+        }
+
+        public function authorizer(): MergeAuthorizer
+        {
+            return new DenyAllMergeAuthorizer;
+        }
+
+        public function connection(): string
+        {
+            throw new RuntimeException('the connection could not be resolved');
+        }
+    };
+
+    $report = (new DefinitionValidator)->validate($definition);
+
+    expect(blockerMessages($report))->toContain('the connection could not be resolved')
+        ->and(array_map(static fn ($issue) => $issue->path, $report->blockers()))
+        ->toContain('connection');
 });
