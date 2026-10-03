@@ -100,6 +100,20 @@ run.
 
 ## Observed results
 
+### The queued path, drained by a real worker
+
+The Filament 5 demo runs `QUEUE_CONNECTION=database`, so the review page's scan control
+queues work instead of doing it inside the request. With no worker running, the page
+reports "Scanning for duplicates…" and keeps the previously published groups on screen.
+Running `php artisan queue:work --stop-when-empty` then processes `ProcessScanChunk` chunk
+by chunk, each job re-dispatching itself while records remain, and the page afterwards
+reports the new completion time with the groups in place. Before the `ScanStarter` fix this
+run would have queued a scan that nothing ever drained.
+
+The dismissed pair was suppressed before that rescan and stayed suppressed after it, which
+is the behaviour the plan asks for: a dismissal survives a scan that finds the same pair
+unchanged.
+
 Filament 5.9.0 (`demo_merge`), definition `shop-customers`:
 
 | Step | Result |
@@ -142,12 +156,7 @@ majors; the only markup difference observed is the surrounding panel chrome
 
 ## Still open after this walkthrough
 
-- **A queued (asynchronous) scan.** Both demos run `QUEUE_CONNECTION=sync`, so the browser
-  path is queued but drained inline. A worker-based run (`database` queue plus
-  `php artisan queue:work`) still has to be walked through once, which also exercises
-  `failed()` and retry handling for the chunk job.
-- **Dismissal journey.** "Not duplicates" was exercised in the browser on Filament 4 but
-  not by hand on Filament 5; dismissal is covered by tests on both majors.
-- **Demo data for every state.** The demo seeders currently create a mergeable pair only.
-  Blank, conflicting-choice, dismissed and blocked cases are still to be seeded so the
-  walkthrough can show each state without hand-editing rows.
+- **A Filament 4 run of the queued path.** The worker-based scan was walked through on the
+  Filament 5 demo; the Filament 4 demo still runs a synchronous queue, where the same
+  dispatch drains inline.
+- **A GIF or short video of the journey.** Recorded by hand, not by the test suite.
