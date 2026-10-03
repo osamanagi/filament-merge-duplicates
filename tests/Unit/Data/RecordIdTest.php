@@ -1,8 +1,10 @@
 <?php
 
+use Illuminate\Database\Eloquent\Model;
 use Nagi\FilamentMergeDuplicates\Data\RecordId;
 use Nagi\FilamentMergeDuplicates\Data\RecordIdCodec;
 use Nagi\FilamentMergeDuplicates\Data\RecordIdType;
+use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Contact;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\InventoryItem;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Note;
@@ -83,4 +85,53 @@ it('detects a ULID key domain', function () {
     $ulid = '01HZX8J9K5N7Q2V3W4X5Y6Z7A8';
 
     expect(RecordIdCodec::detectType(new InventoryItem(['id' => $ulid])))->toBe(RecordIdType::Ulid);
+});
+
+it('orders a negative number by magnitude too', function () {
+    // A signed bigint column can hold a negative key, and ordering has to stay
+    // symmetric or lock ordering is not deterministic.
+    $minusFive = RecordId::fromStored(RecordIdType::Int, '-5');
+    $minusTen = RecordId::fromStored(RecordIdType::Int, '-10');
+    $zero = RecordId::fromStored(RecordIdType::Int, '0');
+
+    expect($minusTen->compareTo($minusFive))->toBeLessThan(0)
+        ->and($minusFive->compareTo($minusTen))->toBeGreaterThan(0)
+        ->and($minusFive->compareTo($zero))->toBeLessThan(0)
+        ->and($zero->compareTo($minusFive))->toBeGreaterThan(0)
+        ->and($minusFive->compareTo(RecordId::fromStored(RecordIdType::Int, '-5')))->toBe(0);
+});
+
+it('round trips a negative key that a model produced', function () {
+    // Regression: fromModel() accepted a negative key while fromStored() rejected it,
+    // so such an ID could be written as a membership and never read back - the review
+    // page would fail on the very record it was indexing.
+    $fromModel = RecordId::fromModel(new Contact(['id' => -5]));
+
+    expect($fromModel->value)->toBe('-5')
+        ->and(RecordId::decode($fromModel->encode())->value)->toBe('-5')
+        ->and(RecordId::fromStored(RecordIdType::Int, '-5')->value)->toBe('-5');
+});
+
+it('still rejects a value that is not an integer key', function (string $value) {
+    expect(fn () => RecordId::fromStored(RecordIdType::Int, $value))
+        ->toThrow(InvalidArgumentException::class);
+})->with(['lone minus' => ['-'], 'letters' => ['-5a'], 'decimal' => ['1.5'], 'space' => [' 5']]);
+
+it('refuses a model whose primary key cannot be a record id', function () {
+    $composite = new class extends Model
+    {
+        protected $primaryKey = ['tenant_id', 'id'];
+    };
+
+    $unnamed = new class extends Model
+    {
+        protected $primaryKey = '';
+    };
+
+    expect(fn () => RecordId::assertSupportedKey($composite))
+        ->toThrow(InvalidConfiguration::class)
+        ->and(fn () => RecordId::assertSupportedKey($unnamed))
+        ->toThrow(InvalidConfiguration::class)
+        ->and(fn () => RecordId::assertSupportedKey(new Contact))
+        ->not->toThrow(InvalidConfiguration::class);
 });

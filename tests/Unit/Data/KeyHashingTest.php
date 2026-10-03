@@ -66,3 +66,19 @@ it('separates scopes by definition, connection, domain and tenant', function () 
         ->and($hasher->hash($base))->not->toBe($hasher->hash(new ScopeIdentity('contacts', 'testing', 'crm', 'tenant-b')))
         ->and($hasher->hash($base))->not->toBe($hasher->hash(new ScopeIdentity('contacts', 'testing', 'crm', null)));
 });
+
+it('reports the version that is part of every digest', function () {
+    expect((new KeyHasher('secret'))->version())->toBe('v1')
+        ->and((new KeyHasher('secret', 'v2'))->version())->toBe('v2');
+});
+
+it('refuses to build a scope hasher without a secret', function () {
+    expect(fn () => new ScopeHasher(''))->toThrow(InvalidConfiguration::class);
+});
+
+it('falls back to the application key when no secret is configured', function () {
+    config(['merge-duplicates.secret' => null]);
+
+    expect(KeyHasher::fromConfig(null)->hash(['contacts'], contactKey()))
+        ->toBe(KeyHasher::fromConfig((string) config('app.key'))->hash(['contacts'], contactKey()));
+});
