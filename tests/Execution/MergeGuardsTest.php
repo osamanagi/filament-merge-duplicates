@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Event;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
@@ -290,6 +291,40 @@ it('rolls back when a host observer reverts a written field', function (string $
     expect($survivor->display_name)->toBe('Keep')
         ->and($source->trashed())->toBeFalse()
         ->and(MergeRecord::on($engine)->count())->toBe(0);
+})->with('engines');
+
+it('counts only the children the transfer will actually move', function (string $engine) {
+    $this->bootEngine($engine);
+
+    $definition = $this->makeDefinition([
+        'relations' => [new CompleteHasMany('childNotes', includesSoftDeletedChildren: true)],
+    ]);
+    $context = $this->contextFor($definition);
+
+    $survivor = $this->makeContact(['reference' => 'ONE']);
+    $source = $this->makeContact(['reference' => 'ONE']);
+
+    $visible = $this->addNote($source, 'visible');
+    $hidden = $this->addNote($source, 'hidden');
+
+    // A global scope the host put on the child model - a tenant scope is the usual
+    // one - decides which children exist. The declared inventory has to agree with
+    // what the transfer will move, or the preview would offer a merge it can never
+    // finish: the executor would abort with "the children changed while the merge
+    // was running" instead of never offering it.
+    Note::addGlobalScope('host-scope', static fn (Builder $query): Builder => $query->where('body', '!=', 'hidden'));
+
+    $plan = $this->planFor($context, $definition, $survivor, $source);
+
+    expect($plan->childIdsFor('childNotes'))->toHaveCount(1);
+
+    $result = app(MergeExecutor::class)->execute($context, $definition, $plan->operationId);
+
+    Note::clearBootedModels();
+
+    expect($result->movedCounts)->toBe(['childNotes' => 1])
+        ->and(Note::withTrashed()->whereKey($visible->getKey())->value('contact_id'))->toBe($survivor->getKey())
+        ->and(Note::withTrashed()->whereKey($hidden->getKey())->value('contact_id'))->toBe($source->getKey());
 })->with('engines');
 
 it('rolls back when a host observer performs a write the database refuses', function (string $engine) {

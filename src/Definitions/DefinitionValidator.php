@@ -439,6 +439,21 @@ final class DefinitionValidator
 
                 if (! $resolved instanceof Relation) {
                     $issues[] = ConfigurationIssue::blocker('invalid_configuration', "The declared relation [{$name}] is not an Eloquent relation.", "relations.{$name}");
+
+                    continue;
+                }
+
+                $relatedConnection = $resolved->getRelated()->getConnectionName()
+                    ?? (string) config('database.default');
+
+                if ($relatedConnection !== $definition->connection()) {
+                    $relatedClass = $resolved->getRelated()::class;
+
+                    $issues[] = ConfigurationIssue::blocker(
+                        'invalid_configuration',
+                        "The relation [{$name}] targets [{$relatedClass}] on connection [{$relatedConnection}] while the definition runs on [{$definition->connection()}]. Cross-connection merges are unsupported, because the child writes could not be rolled back with the rest of the merge.",
+                        "relations.{$name}",
+                    );
                 }
             } catch (Throwable $exception) {
                 $issues[] = ConfigurationIssue::blocker(

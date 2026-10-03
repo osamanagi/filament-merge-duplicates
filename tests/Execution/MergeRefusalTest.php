@@ -6,6 +6,7 @@ use Nagi\FilamentMergeDuplicates\Data\RecordIdType;
 use Nagi\FilamentMergeDuplicates\Exceptions\DomainConflict;
 use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
 use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
+use Nagi\FilamentMergeDuplicates\Exceptions\MergeDuplicatesException;
 use Nagi\FilamentMergeDuplicates\Exceptions\RecordUnavailable;
 use Nagi\FilamentMergeDuplicates\Exceptions\StalePreview;
 use Nagi\FilamentMergeDuplicates\Merging\MergeExecutor;
@@ -412,6 +413,22 @@ it('reads the committed choices back from the history it can use', function (str
     );
 
     expect($result->replayed)->toBeTrue();
+})->with('engines');
+
+it('refuses a preview built under another definition revision', function (string $engine) {
+    $this->bootEngine($engine);
+
+    [$definition, $context, $plan] = $this->refusalPlan();
+
+    // The definition was revised after the preview was created, so the plan
+    // describes a configuration that no longer exists. It is refused rather than
+    // executed against the new one, and nothing is written.
+    $revised = $this->makeDefinition(['revision' => '2']);
+
+    expect(fn () => app(MergeExecutor::class)->execute($context, $revised, $plan->operationId))
+        ->toThrow(MergeDuplicatesException::class);
+
+    expect(MergeRecord::on($engine)->count())->toBe(0);
 })->with('engines');
 
 it('refuses a merge whose declared children changed after the preview', function (string $engine) {

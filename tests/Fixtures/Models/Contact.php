@@ -28,4 +28,13 @@ class Contact extends Model
     {
         return $this->hasMany(Note::class, 'contact_id');
     }
+
+    /**
+     * A relation whose model lives on another connection: declared so the
+     * definition validator can refuse it.
+     */
+    public function detachedNotes(): HasMany
+    {
+        return $this->hasMany(DetachedNote::class, 'contact_id');
+    }
 }

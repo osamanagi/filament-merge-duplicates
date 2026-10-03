@@ -148,6 +148,7 @@ package claims to ship:
 | --- | --- |
 | A GIF or short video of the journey (scan, review, merge, audit, banner) | Maintainer |
 | Beta feedback from at least three applications with different schemas | Maintainer |
+| An RTL and a keyboard-only pass on both majors (U01 stays `partial` for this) | Maintainer |
 | Triaging beta blockers and recording the limitations beta found | Maintainer, with the package work that follows |
 | Tagging `v1.0.0` and submitting to the registries | Maintainer, explicitly authorized |
 | The 40 lines listed under "Review of the coverage exceptions" | None: they are reviewed and closed as unreachable |

@@ -607,6 +607,19 @@ it('blocks a relation that declares an unknown relation type', function () {
     expect(blockerMessages($report))->toContain('unknown relation type');
 });
 
+it('blocks a relation that reaches a model on another connection', function () {
+    // The child writes would live outside the merge transaction, so a failure
+    // after them could not be rolled back: refused before anything is planned.
+    config()->set('database.connections.detached_connection', config('database.connections.testing'));
+
+    $report = validateDefinition(mergeReadyConfig([
+        'relations' => [new CompleteHasMany('detachedNotes')],
+    ]));
+
+    expect(blockerMessages($report))->toContain('Cross-connection merges are unsupported')
+        ->and(blockerMessages($report))->toContain('detached_connection');
+});
+
 it('blocks a relation whose accessor cannot be resolved', function () {
     $report = validateDefinition(mergeReadyConfig([
         'relations' => [new CompleteHasMany('getAttribute')],
