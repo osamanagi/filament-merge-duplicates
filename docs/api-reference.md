@@ -131,6 +131,7 @@ components, which is why one implementation renders on both majors.
 | Command | Options |
 | --- | --- |
 | `filament-merge-duplicates:scan {definition}` | `--actor=` (service actor reference), `--panel=cli`, `--tenant=`, `--sync` (drain inline instead of queueing). |
+| `filament-merge-duplicates:prune` | `--connection=` (the connection holding the package tables). Deletes expired preview rows and nothing else; safe to schedule daily. |
 
 ## Events
 

@@ -8,6 +8,7 @@ use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentIcon;
 use Illuminate\Filesystem\Filesystem;
 use Livewire\Features\SupportTesting\Testable;
+use Nagi\FilamentMergeDuplicates\Commands\PruneDuplicatesCommand;
 use Nagi\FilamentMergeDuplicates\Commands\ScanDuplicatesCommand;
 use Nagi\FilamentMergeDuplicates\Data\KeyHasher;
 use Nagi\FilamentMergeDuplicates\Data\ScopeHasher;
@@ -229,6 +230,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
     protected function getCommands(): array
     {
         return [
+            PruneDuplicatesCommand::class,
             ScanDuplicatesCommand::class,
         ];
     }

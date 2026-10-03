@@ -82,6 +82,14 @@ The package registers one stylesheet. If your app serves Filament's assets from
 php artisan filament:assets
 ```
 
+Schedule the prune command if you want expired merge previews cleaned up. They are
+refused as stale whether or not they are pruned, so this is housekeeping rather than
+correctness:
+
+```php
+$schedule->command('filament-merge-duplicates:prune')->daily();
+```
+
 The translations and views are publishable under
 `filament-merge-duplicates-translations` and `filament-merge-duplicates-views`,
 but neither has to be published: the package ships working defaults.
@@ -108,10 +116,11 @@ Two things to know before you configure anything:
   secret or `app.key` invalidates published generations and dismissals, so a
   rotation needs a rescan. Matching keys are also not portable between
   applications.
-- `retention.previews_days` and `retention.scans_days` exist but are not consumed
-  yet: pruning package rows is not implemented. Previews do expire by TTL when
-  they are read, and the merge ledger is never pruned. See
-  [docs/support-matrix.md](docs/support-matrix.md) for the exact boundary.
+- `retention.scans_days` exists but is not consumed: pruning finished scans, their
+  memberships and dismissals is not implemented, so those rows accumulate. Expired
+  previews are pruned by `filament-merge-duplicates:prune`, and the merge ledger is
+  never pruned. See [docs/support-matrix.md](docs/support-matrix.md) for the exact
+  boundary.
 
 ## Walkthrough: two unrelated resources in one panel
 

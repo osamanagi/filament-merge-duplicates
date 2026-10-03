@@ -100,7 +100,11 @@ final class PreviewStore
      */
     public function pruneExpired(?string $connection = null): int
     {
-        return PreviewRecord::on($connection ?? (string) config('database.default'))
+        // The package tables follow `merge-duplicates.connection`, which is not
+        // necessarily the application's default connection.
+        $connection ??= (new PreviewRecord)->getConnectionName();
+
+        return PreviewRecord::on($connection)
             ->where('expires_at', '<', now())
             ->delete();
     }
