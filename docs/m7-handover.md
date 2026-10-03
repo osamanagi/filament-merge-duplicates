@@ -1,10 +1,12 @@
 # M7 handover — stable v1.0
 
-Status: **the package-side work of M7 is done.** The release is held by two items
-that only a human can produce: the demo GIF or video, and beta feedback from real
-applications. They are listed under "Still open" rather than quietly dropped.
+Status: **the package-side work of M7 is done and merged.** The release is held by
+two items that only a human can produce: the demo GIF or video, and beta feedback
+from real applications. They are listed under "Still open" rather than quietly
+dropped.
 
-Branch: `m7/stable-v1.0`, cut from the M6 tip so it carries M6 until that merges.
+Branch: `m7/stable-v1.0`, merged into `main` as PR #8 (`c2baba0`) on 2026-10-03,
+carrying M6 (PR #7). No tag exists yet.
 
 ## What M7 delivered
 
@@ -123,10 +125,32 @@ package claims to ship:
 | Static analysis | PHPStan level 5, no errors |
 | Code style | Pint clean on every commit in the branch |
 | Both lanes | 624 passed / 1 skipped / 1746 assertions on `^4.0` and `^5.0` |
+| Final CI matrix | Green on `main` after the merge (run [37154968412](https://github.com/osamanagi/filament-merge-duplicates/actions/runs/37154968412)): Pint and PHPStan, **both coverage gates blocking and passing**, 16 lane jobs across `f4/f5` x `lowest/current` x PHP 8.2/8.3/8.4 with MySQL 8 and PostgreSQL 15 services, and 6 resolution jobs for `^4.0`/`^5.0` on PHP 8.2/8.3/8.4. `zizmor` and `fix-code-style` also pass |
 | Execution suite on real engines | MySQL 8.0 and PostgreSQL 15, all green |
 | Concurrency suite | 7 passed across both engines |
 | Benchmark | recorded in `docs/testing.md`, with the M4 numbers alongside |
 | Documentation consistency | every PHP example in the README and `docs/` is executed by `tests/Feature/DocumentationExamplesTest.php` |
+| Hands-on journey on both majors | walked end to end on the merged `main`, on a Filament 5 and a Filament 4 installation (see below) |
+
+## Hands-on verification on both majors
+
+The M7 gate asks for the journey to be reproduced in both installations, not just
+in tests. It was walked on `main` after the merge, with the package loaded by
+PSR-4 so the merged code is what ran:
+
+| Step | Filament 5 (`:8000`, MySQL) | Filament 4 (`:8124`, MySQL) |
+| --- | --- | --- |
+| Banner above the resource table | 2 possible duplicate groups, with the age of the last scan | empty state before the scan: "No possible duplicates found" |
+| Scan | started from the review page; queue worker drained the chunk jobs | confirmation modal, then `ProcessScanChunk` ran twice (158 ms / 14 ms) and the banner moved to 1 group |
+| Review | `Same name` group of 3 records for Ada Lovelace | `Same name` group for the pair seeded for the run |
+| Compare | `Confirm merge` refused until the conflicting `phone` was chosen | same refusal, then the source value was chosen instead |
+| Merge | completed, audit reference shown and notification sent | completed, audit reference shown and notification sent |
+| Audit | full entry: definition, revision, `scope_hash`, `actor_ref user:1`, `panel_id admin`, fingerprint, per-field before/after | full entry, `choice: "source"` and `after: +1-555-0299` recording the taken value |
+| Database | survivor kept, source soft-deleted at the merge timestamp | survivor took the source value, source soft-deleted, ledger row for the operation |
+
+Both installations rendered the pages with plain semantic markup and no
+major-specific view differences, which is the claim the single release line
+rests on.
 
 ## Decisions taken in M7
 
@@ -144,6 +168,18 @@ package claims to ship:
 - **Nothing was weakened to satisfy a metric.** No assertion was deleted and no
   `--min` was lowered; the number moved from 83.3% to 98.2% by writing tests.
 
+## Follow-ups recorded after the first green run
+
+Two CI annotations from the merge run are worth acting on before the next release,
+neither of them a gate item:
+
+- `actions/upload-artifact` is pinned at v4.6.2, which targets Node 20; GitHub is
+  forcing it onto Node 24 with a deprecation warning. It still runs today, and
+  bumping the pin means a new SHA and a fresh CI run, so it is a separate change.
+- `ubuntu-latest` will point at Ubuntu 26 from 2026-10-19. The lanes use MySQL and
+  PostgreSQL service containers, so a pinned `ubuntu-24.04` (or a verified run on
+  26) is the safer choice for the next release.
+
 ## Still open
 
 | Item | Owner |
@@ -152,7 +188,7 @@ package claims to ship:
 | Beta feedback from at least three applications with different schemas | Maintainer |
 | An RTL and a keyboard-only pass on both majors (U01 stays `partial` for this) | Maintainer |
 | Triaging beta blockers and recording the limitations beta found | Maintainer, with the package work that follows |
-| Tagging `v1.0.0` and submitting to the registries | Maintainer, explicitly authorized |
+| Tagging `v1.0.0` and submitting to the registries | Maintainer, explicitly authorized. The merged `main` is the tag target, and the `v1.0.0` changelog section is already written for the release automation |
 | The 40 lines listed under "Review of the coverage exceptions" | None: they are reviewed and closed as unreachable |
 
 ## After M7
