@@ -114,6 +114,11 @@ The dismissed pair was suppressed before that rescan and stayed suppressed after
 is the behaviour the plan asks for: a dismissal survives a scan that finds the same pair
 unchanged.
 
+The Filament 4 demo was moved to the same configuration and proves the same path there:
+the CLI queued one job, `queue:work --stop-when-empty` drained two chunks, the queue
+ended empty and the scan row finished as `succeeded` with 1001 indexed records. Both
+installations therefore run queued scans, not just inline ones.
+
 Filament 5.9.0 (`demo_merge`), definition `shop-customers`:
 
 | Step | Result |
@@ -156,7 +161,6 @@ majors; the only markup difference observed is the surrounding panel chrome
 
 ## Still open after this walkthrough
 
-- **A Filament 4 run of the queued path.** The worker-based scan was walked through on the
-  Filament 5 demo; the Filament 4 demo still runs a synchronous queue, where the same
-  dispatch drains inline.
 - **A GIF or short video of the journey.** Recorded by hand, not by the test suite.
+- **Beta feedback.** Three real applications with different schemas; nothing in the
+  package substitutes for that.
