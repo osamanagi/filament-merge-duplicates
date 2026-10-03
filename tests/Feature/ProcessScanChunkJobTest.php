@@ -4,12 +4,16 @@ namespace Nagi\FilamentMergeDuplicates\Tests\Feature;
 
 use Illuminate\Support\Facades\Queue;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
+use Nagi\FilamentMergeDuplicates\Data\RecordId;
+use Nagi\FilamentMergeDuplicates\Data\RecordIdType;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
 use Nagi\FilamentMergeDuplicates\Exceptions\RetryExhausted;
 use Nagi\FilamentMergeDuplicates\Jobs\ProcessScanChunk;
 use Nagi\FilamentMergeDuplicates\Models\MembershipRecord;
+use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
 use Nagi\FilamentMergeDuplicates\Models\ScanRecord;
 use Nagi\FilamentMergeDuplicates\Models\ScopeRecord;
+use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanChunkProcessor;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanCoordinator;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanState;
@@ -181,4 +185,45 @@ it('ignores a scan id that no longer exists', function () {
 
     expect(MembershipRecord::query()->count())->toBe(0)
         ->and(ScanRecord::on('testing')->count())->toBe(0);
+});
+
+it('counts a record an earlier merge retired as skipped instead of indexing it', function () {
+    Queue::fake();
+    $definition = jobDefinition();
+    $context = jobContext($definition);
+
+    $retired = jobRecord('ACME');
+    jobRecord('ACME');
+
+    $resolver = app(RetirementResolver::class);
+
+    // A retired source still exists in its table, so the scan has to exclude it
+    // from the index explicitly rather than relying on a soft-delete scope.
+    MergeRecord::on('testing')->create([
+        'operation_id' => '01HZX8J9K5N7Q2V3W4X5Y6A401',
+        'scope_id' => '01HZX8J9K5N7Q2V3W4X5Y6A402',
+        'retirement_domain' => $resolver->domainDigest(
+            $definition->connection(),
+            $definition->model(),
+            $definition->ownershipDomain(),
+        ),
+        'source_id' => (string) $retired->getKey(),
+        'source_id_type' => RecordId::fromModel($retired)->type->value,
+        'survivor_id' => '9999',
+        'survivor_id_type' => RecordIdType::Int->value,
+        'actor_ref' => 'actor-1',
+        'definition_revision' => '1',
+        'audit_payload' => 'placeholder',
+        'committed_at' => now(),
+    ]);
+
+    $scan = app(ScanCoordinator::class)->start($definition, $context);
+    runChunkJob(chunkJob($definition->id(), $context, $scan->id));
+
+    $scan->refresh();
+
+    expect($scan->counter('skipped_retired'))->toBe(1)
+        ->and($scan->counter('indexed'))->toBe(1)
+        ->and($scan->counter('scanned'))->toBe(2)
+        ->and(MembershipRecord::on('testing')->where('record_id', (string) $retired->getKey())->count())->toBe(0);
 });

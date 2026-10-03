@@ -37,11 +37,9 @@ final class EmailNormalizer implements Normalizer
             return null;
         }
 
+        // Validation above guarantees a single `@`, so the split cannot fail and
+        // needs no defensive branch.
         $at = strrpos($address, '@');
-
-        if ($at === false) {
-            return null;
-        }
 
         $local = substr($address, 0, $at);
         $domain = substr($address, $at + 1);
