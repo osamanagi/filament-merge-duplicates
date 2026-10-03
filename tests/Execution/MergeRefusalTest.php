@@ -9,7 +9,7 @@ use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
 use Nagi\FilamentMergeDuplicates\Exceptions\RecordUnavailable;
 use Nagi\FilamentMergeDuplicates\Merging\MergeExecutor;
 use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
-use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\RevokedAfterFirstCheck;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\RevokedAfterChecks;
 
 /*
 |--------------------------------------------------------------------------
@@ -162,7 +162,7 @@ it('refuses when the actor loses the merge ability after the preview', function 
     // The first check passes, the re-check inside the transaction does not: a
     // permission revoked between the preview and the confirmation must abort the
     // merge rather than be remembered.
-    $revoking = $this->makeDefinition(['authorizer' => new RevokedAfterFirstCheck]);
+    $revoking = $this->makeDefinition(['authorizer' => new RevokedAfterChecks]);
 
     expect(fn () => app(MergeExecutor::class)->execute($context, $revoking, $plan->operationId))
         ->toThrow(function (ForbiddenOperation $exception): void {

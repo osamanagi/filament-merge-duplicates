@@ -25,12 +25,15 @@ use Nagi\FilamentMergeDuplicates\Models\ScopeRecord;
 use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
 use Nagi\FilamentMergeDuplicates\Scanning\KeyBuilder;
 use Nagi\FilamentMergeDuplicates\Scanning\ScopeManager;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Enums\FixtureStatus;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Contact;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Note;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\CompleteHasMany;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\ConfigurableDefinition;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\PanelContextResolver;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\PassThroughMergeValidator;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\RecordingWriterGuard;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\RevokedAfterChecks;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\SoftDeleteRetirementStrategy;
 
 use function Pest\Livewire\livewire;
@@ -646,4 +649,204 @@ it('formats a value it cannot encode as nothing rather than as null', function (
     // A resource cannot be JSON encoded; the page must show nothing instead of the
     // word "null" or a warning.
     expect($audit->formatValue(fopen('php://memory', 'r')))->toBe('');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Forged requests and moved data
+|--------------------------------------------------------------------------
+|
+| The page is a Livewire component, so every public method can be called
+| directly by a browser. Each one therefore re-checks its own input instead of
+| trusting that the rendered markup only offered valid choices, and each one
+| reports a moved-away record as a missing page rather than as a blank
+| comparison.
+*/
+
+it('ignores a survivor that is not one of the two records', function () {
+    mergePreviewDefinition('fixture-merge-stranger', ['review', 'merge']);
+    mergePreviewPanel(['fixture-merge-stranger']);
+
+    [$older, $newer] = mergePreviewPair();
+
+    livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-merge-stranger',
+        'first' => (string) $older->getKey(),
+        'second' => (string) $newer->getKey(),
+    ])
+        // A record outside the pair, and an unrelated field: both are ignored,
+        // because the plan is the only thing that may decide what is choosable.
+        ->call('setSurvivor', '999999')
+        ->assertSet('survivorValue', (string) $older->getKey())
+        ->call('setChoice', 'email', 'source')
+        ->assertSet('choices', []);
+});
+
+it('reports a configuration error instead of a preview, and refuses to confirm', function () {
+    mergePreviewDefinition('fixture-merge-invalid', ['review', 'merge'], [
+        // No retirement strategy: detection works, merging is not enabled.
+        'retirementStrategy' => null,
+    ]);
+    mergePreviewPanel(['fixture-merge-invalid']);
+
+    [$older, $newer] = mergePreviewPair();
+
+    livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-merge-invalid',
+        'first' => (string) $older->getKey(),
+        'second' => (string) $newer->getKey(),
+    ])
+        ->assertOk()
+        ->assertSet('configurationError', 'invalid_configuration')
+        ->call('confirm')
+        ->assertSet('merged', false);
+
+    expect(MergeRecord::on('testing')->count())->toBe(0);
+});
+
+it('refuses to dismiss for an actor who may only merge', function () {
+    mergePreviewDefinition('fixture-merge-dismissal', ['review', 'merge']);
+    mergePreviewPanel(['fixture-merge-dismissal']);
+
+    [$older, $newer] = mergePreviewPair();
+
+    // Dismissing is a separate ability from merging, and the page cannot grant it
+    // by rendering a button.
+    livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-merge-dismissal',
+        'first' => (string) $older->getKey(),
+        'second' => (string) $newer->getKey(),
+    ])
+        ->call('dismiss')
+        ->assertForbidden();
+
+    expect(DismissalRecord::on('testing')->count())->toBe(0);
+});
+
+it('reports a pair whose record is gone as a missing page', function () {
+    mergePreviewDefinition('fixture-merge-vanished', ['review', 'dismiss', 'merge']);
+    mergePreviewPanel(['fixture-merge-vanished']);
+
+    [$older, $newer] = mergePreviewPair();
+
+    $page = livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-merge-vanished',
+        'first' => (string) $older->getKey(),
+        'second' => (string) $newer->getKey(),
+    ]);
+
+    // The record is gone from the database, so re-reading the pair cannot answer.
+    Contact::query()->getConnection()->table('fixture_contacts')->where('id', $newer->getKey())->delete();
+
+    $page->call('dismiss')->assertNotFound();
+
+    livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-merge-vanished',
+        'first' => (string) $older->getKey(),
+        'second' => (string) $newer->getKey(),
+    ])
+        ->call('setSurvivor', (string) $newer->getKey())
+        ->assertNotFound();
+});
+
+it('refuses the page when no trusted context can be resolved', function () {
+    mergePreviewDefinition('fixture-merge-no-context', ['review', 'merge'], [
+        'contextResolver' => new PanelContextResolver(actorRef: null),
+    ]);
+    mergePreviewPanel(['fixture-merge-no-context']);
+
+    // A page that cannot establish who is acting must not render a comparison at
+    // all, let alone offer to merge anything.
+    livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-merge-no-context',
+        'first' => '1',
+        'second' => '2',
+    ])->assertForbidden();
+});
+
+it('refuses the page when the merge ability is gone before the preview is built', function () {
+    // The mount check passes and the planner's own check does not, so no preview
+    // exists to show: the request is refused instead of rendering an empty page.
+    mergePreviewDefinition('fixture-merge-revoked-mount', [], [
+        'authorizer' => new RevokedAfterChecks,
+    ]);
+    mergePreviewPanel(['fixture-merge-revoked-mount']);
+
+    [$older, $newer] = mergePreviewPair();
+
+    livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-merge-revoked-mount',
+        'first' => (string) $older->getKey(),
+        'second' => (string) $newer->getKey(),
+    ])->assertForbidden();
+});
+
+it('renders a date and an enum field as text', function () {
+    mergePreviewDefinition('fixture-merge-formats', ['review', 'merge'], [
+        'fields' => [
+            MergeField::make('verified_at')->label('Verified at'),
+            MergeField::make('status')->label('Status'),
+        ],
+    ]);
+    mergePreviewPanel(['fixture-merge-formats']);
+
+    $older = Contact::create([
+        'tenant_id' => 'tenant-a',
+        'display_name' => 'Older',
+        'reference' => 'SAME',
+        'verified_at' => '2026-01-02 03:04:05',
+        'status' => FixtureStatus::Active,
+    ]);
+
+    $newer = Contact::create([
+        'tenant_id' => 'tenant-a',
+        'display_name' => 'Newer',
+        'reference' => 'SAME',
+        'verified_at' => '2026-06-07 08:09:10',
+        'status' => FixtureStatus::Archived,
+    ]);
+
+    // A date is shown as an ISO instant rather than as a cast object, and an enum
+    // as its backing value rather than as a case name.
+    livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-merge-formats',
+        'first' => (string) $older->getKey(),
+        'second' => (string) $newer->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('2026-01-02T03:04:05+00:00')
+        ->assertSee('2026-06-07T08:09:10+00:00')
+        ->assertSee('active')
+        ->assertSee('archived');
+});
+
+it('renders a boolean field as a word rather than as a number', function () {
+    mergePreviewDefinition('fixture-merge-boolean', ['review', 'merge'], [
+        'fields' => [MergeField::make('verified')->label('Verified')],
+    ]);
+    mergePreviewPanel(['fixture-merge-boolean']);
+
+    $verified = Contact::create([
+        'tenant_id' => 'tenant-a',
+        'display_name' => 'Verified',
+        'reference' => 'SAME',
+        'verified' => true,
+    ]);
+
+    $unverified = Contact::create([
+        'tenant_id' => 'tenant-a',
+        'display_name' => 'Unverified',
+        'reference' => 'SAME',
+        'verified' => false,
+    ]);
+
+    livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-merge-boolean',
+        'first' => (string) $verified->getKey(),
+        'second' => (string) $unverified->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('true')
+        ->assertSee('false')
+        ->assertDontSee('>1<', false);
 });

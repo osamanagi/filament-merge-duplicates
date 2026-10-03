@@ -17,6 +17,15 @@ return new class extends Migration
             $table->string('display_name')->nullable();
             $table->text('notes')->nullable();
 
+            // A boolean field, so the value rendering has something narrower
+            // than a string to format.
+            $table->boolean('verified')->nullable();
+
+            // A date field and a backed-enum field, the other two shapes a
+            // declared field can hold and have to be rendered as text.
+            $table->timestamp('verified_at')->nullable();
+            $table->string('status')->nullable();
+
             // A JSON column with no cast: a field stored here cannot be merged
             // by comparison, whichever way it was declared.
             $table->json('payload')->nullable();

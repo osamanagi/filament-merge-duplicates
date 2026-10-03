@@ -6,6 +6,7 @@ use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateMergePage;
 use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesPlugin;
 use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Note;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\RevokedAfterChecks;
 
 use function Pest\Livewire\livewire;
 
@@ -102,4 +103,58 @@ it('refuses to merge when the pair changed after the preview', function (string 
     expect($page->get('operationId'))->not->toBe($staleOperationId)
         ->and($source->trashed())->toBeFalse()
         ->and(MergeRecord::on($engine)->count())->toBe(0);
+})->with('engines');
+
+it('ignores a second confirmation once the merge is committed', function (string $engine) {
+    $this->bootEngine($engine);
+
+    $definition = $this->makeDefinition();
+    app(DefinitionRegistry::class)->register($definition);
+    executionMergePagePanel();
+
+    $this->contextFor($definition);
+
+    $survivor = $this->makeContact(['reference' => 'SAME', 'display_name' => 'Keep']);
+    $source = $this->makeContact(['reference' => 'SAME', 'display_name' => 'Other']);
+
+    $page = livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-contacts',
+        'first' => (string) $survivor->getKey(),
+        'second' => (string) $source->getKey(),
+    ])
+        ->call('setChoice', 'display_name', 'source')
+        ->call('confirm')
+        ->assertSet('merged', true);
+
+    // A replayed confirmation - a double click, or a resent request - must not
+    // merge again: the committed operation is reported, not repeated.
+    $page->call('confirm')->assertSet('merged', true);
+
+    expect(MergeRecord::on($engine)->count())->toBe(1)
+        ->and(Note::query()->where('contact_id', $survivor->getKey())->count())->toBe(0);
+})->with('engines');
+
+it('refuses to confirm when the merge permission is revoked after the preview', function (string $engine) {
+    $this->bootEngine($engine);
+
+    // The page checks the ability once at mount and the planner once while
+    // building the preview; the executor's re-check is the third and is denied.
+    $definition = $this->makeDefinition(['authorizer' => new RevokedAfterChecks(2)]);
+    app(DefinitionRegistry::class)->register($definition);
+    executionMergePagePanel();
+
+    $this->contextFor($definition);
+
+    $survivor = $this->makeContact(['reference' => 'SAME']);
+    $source = $this->makeContact(['reference' => 'SAME']);
+
+    livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-contacts',
+        'first' => (string) $survivor->getKey(),
+        'second' => (string) $source->getKey(),
+    ])
+        ->call('confirm')
+        ->assertForbidden();
+
+    expect(MergeRecord::on($engine)->count())->toBe(0);
 })->with('engines');

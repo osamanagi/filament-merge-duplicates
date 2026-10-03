@@ -2,15 +2,20 @@
 
 namespace Nagi\FilamentMergeDuplicates\Tests\Feature;
 
+use Filament\Contracts\Plugin;
 use Filament\Facades\Filament;
+use Filament\Panel;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
+use Nagi\FilamentMergeDuplicates\Contracts\ContextResolver;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
 use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
+use Nagi\FilamentMergeDuplicates\Exceptions\MissingContext;
+use Nagi\FilamentMergeDuplicates\Filament\Banner\DuplicateBanner;
 use Nagi\FilamentMergeDuplicates\Filament\Concerns\HasDuplicateSuggestions;
 use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateReviewPage;
 use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesPlugin;
@@ -25,6 +30,7 @@ use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Livewire\DuplicateBannerProbe;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Contact;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\InventoryItem;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\ConfigurableDefinition;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\PanelContextResolver;
 
 use function Pest\Livewire\livewire;
 
@@ -504,4 +510,112 @@ it('confirms a scan through a Filament modal action', function () {
         ->assertOk();
 
     expect(ScanRecord::on($context->connection)->count())->toBe(1);
+});
+
+it('refuses the page when no trusted context can be resolved', function () {
+    // A guest has no actor, so nothing about this definition can be resolved
+    // safely - not the scope, not the ability, not the list.
+    $definition = new ConfigurableDefinition([
+        'id' => 'fixture-review-contextless',
+        'model' => Contact::class,
+        'label' => 'Record',
+        'authorizer' => new AbilityMapAuthorizer([Ability::Review], 'actor-1'),
+        'contextResolver' => new PanelContextResolver(actorRef: null),
+    ]);
+
+    app(DefinitionRegistry::class)->register($definition);
+    reviewPagePanel(['fixture-review-contextless']);
+
+    livewire(DuplicateReviewPage::class, ['definition' => 'fixture-review-contextless'])
+        ->assertForbidden();
+});
+
+it('builds the banner for the definition it is showing', function () {
+    reviewPageDefinition('fixture-review-banner', Contact::class, ['review']);
+    reviewPagePanel(['fixture-review-banner']);
+    reviewPageContext(app(DefinitionRegistry::class)->get('fixture-review-banner'));
+
+    $page = livewire(DuplicateReviewPage::class, ['definition' => 'fixture-review-banner'])
+        ->assertOk();
+
+    // The banner on the page is the same object a resource header gets, built by
+    // the same factory, so the wording and the abilities cannot diverge.
+    expect($page->instance()->duplicateBanner())->toBeInstanceOf(DuplicateBanner::class);
+});
+
+it('renders without the scan and merge controls when the actor has gone', function () {
+    // Mount and the page's own context resolve; the banner, the scan offer and the
+    // merge offer then find no actor at all. A panel must not break for someone
+    // whose session just ended, so each of those is answered with "no".
+    $resolver = new class implements ContextResolver
+    {
+        private int $actorReads = 0;
+
+        public function actorRef(): string
+        {
+            // The setup resolves the context once, mount resolves it twice (its
+            // own context and the review ability) and the page's view data once
+            // more; every read after that finds no actor at all.
+            return ++$this->actorReads <= 4
+                ? 'actor-1'
+                : throw new MissingContext('No actor is authenticated.');
+        }
+
+        public function panelId(): string
+        {
+            return 'admin';
+        }
+
+        public function tenant(): ?string
+        {
+            return 'tenant-a';
+        }
+
+        public function contextFor(string $definitionId, string $connection, string $scopeHash): DuplicateContext
+        {
+            return new DuplicateContext($definitionId, $connection, $scopeHash, 'actor-1', 'admin', 'tenant-a');
+        }
+    };
+
+    $definition = new ConfigurableDefinition([
+        'id' => 'fixture-review-vanished-actor',
+        'model' => Contact::class,
+        'label' => 'Record',
+        'scopeKeys' => ['tenant_id'],
+        'authorizer' => new AbilityMapAuthorizer([Ability::Review, Ability::Scan, Ability::Merge], 'actor-1'),
+        'contextResolver' => $resolver,
+    ]);
+
+    app(DefinitionRegistry::class)->register($definition);
+    reviewPagePanel(['fixture-review-vanished-actor']);
+    reviewPageContext($definition);
+
+    livewire(DuplicateReviewPage::class, ['definition' => 'fixture-review-vanished-actor'])
+        ->assertOk()
+        ->assertDontSee('Start duplicate scan');
+});
+
+it('exposes no definitions on a panel that registers something else under the plugin ID', function () {
+    reviewPageDefinition('fixture-review-conflict', Contact::class, ['review']);
+
+    $panel = Filament::getPanel('admin');
+
+    // A third-party plugin claiming the same ID: the page must treat the panel as
+    // exposing nothing rather than trusting whatever it finds under the ID.
+    $panel->plugin(new class implements Plugin
+    {
+        public function getId(): string
+        {
+            return 'filament-merge-duplicates';
+        }
+
+        public function register(Panel $panel): void {}
+
+        public function boot(Panel $panel): void {}
+    });
+
+    Filament::setCurrentPanel($panel);
+
+    livewire(DuplicateReviewPage::class, ['definition' => 'fixture-review-conflict'])
+        ->assertNotFound();
 });
