@@ -12,6 +12,7 @@ use Nagi\FilamentMergeDuplicates\Data\RecordId;
 use Nagi\FilamentMergeDuplicates\Data\RecordIdType;
 use Nagi\FilamentMergeDuplicates\Definitions\MergeField;
 use Nagi\FilamentMergeDuplicates\Matching\ExactRule;
+use Nagi\FilamentMergeDuplicates\Merging\AuditWriter;
 use Nagi\FilamentMergeDuplicates\Merging\MergePlan;
 use Nagi\FilamentMergeDuplicates\Merging\MergePlanner;
 use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
@@ -283,14 +284,57 @@ trait ExecutionHarness
      */
     public function replaceStoredPlan(string $engine, MergePlan $original, MergePlan $replacement): void
     {
-        $payload = json_encode($replacement->toPayload(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $this->replaceStoredPayload($engine, $original->operationId, $replacement->toPayload());
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function replaceStoredPayload(string $engine, string $operationId, array $payload): void
+    {
+        $encoded = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
         DB::connection($engine)->table('filament_merge_duplicates_previews')
-            ->where('operation_id', $original->operationId)
+            ->where('operation_id', $operationId)
             ->update([
-                'plan_payload' => Crypt::encryptString($payload),
-                'payload_hash' => hash('sha256', $payload),
+                'plan_payload' => Crypt::encryptString($encoded),
+                'payload_hash' => hash('sha256', $encoded),
             ]);
+    }
+
+    /**
+     * Records one committed operation with a hand-built audit payload, bound to
+     * the scope of the plan it belongs to. Used to read a replay back without
+     * running a merge first.
+     *
+     * @param  array<string, mixed>  $audit
+     */
+    public function recordOperation(
+        string $engine,
+        ConfigurableDefinition $definition,
+        string $operationId,
+        array $audit,
+        string $actor = 'actor-1',
+        string $panel = 'admin',
+    ): MergeRecord {
+        $scopeId = DB::connection($engine)
+            ->table('filament_merge_duplicates_scopes')
+            ->where('definition_id', $definition->id())
+            ->value('id');
+
+        return MergeRecord::on($engine)->create([
+            'operation_id' => $operationId,
+            'scope_id' => (string) $scopeId,
+            'retirement_domain' => 'replayed-operation-domain',
+            'source_id' => '2',
+            'source_id_type' => RecordIdType::Int->value,
+            'survivor_id' => '1',
+            'survivor_id_type' => RecordIdType::Int->value,
+            'actor_ref' => $actor,
+            'definition_revision' => $definition->revision(),
+            'audit_payload' => app(AuditWriter::class)->encode($audit),
+            'committed_at' => now(),
+        ]);
     }
 
     /**

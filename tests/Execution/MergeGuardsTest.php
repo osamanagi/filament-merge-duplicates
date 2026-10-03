@@ -237,3 +237,89 @@ it('lists the retired mappings for a data scope', function (string $engine) {
         ->and($mappings[0]['survivor_id'])->toBe((string) $survivor->getKey())
         ->and($mappings[0]['source_id_type'])->toBe('int');
 })->with('engines');
+
+/*
+|--------------------------------------------------------------------------
+| R04 - a host observer cannot leave a half-finished merge committed
+|--------------------------------------------------------------------------
+|
+| Hosts run their own model events, and one of them can undo what the merge
+| just wrote. The postconditions are checked inside the transaction and before
+| the commit, so a merge that a host silently reversed is rolled back rather
+| than recorded as committed.
+*/
+
+it('rolls back when a host observer reverts a written field', function (string $engine) {
+    $this->bootEngine($engine);
+
+    $definition = $this->makeDefinition();
+    $context = $this->contextFor($definition);
+
+    $survivor = $this->makeContact(['reference' => 'ONE', 'display_name' => 'Keep']);
+    $source = $this->makeContact(['reference' => 'ONE', 'display_name' => 'Take']);
+
+    $plan = $this->planFor($context, $definition, $survivor, $source);
+
+    // An observer that puts the survivor's own value back after the merge wrote
+    // the reviewed one: the audit would claim a value the record does not hold.
+    Contact::updated(function (Contact $updated) use ($survivor): void {
+        if ($updated->getKey() === $survivor->getKey() && $updated->display_name === 'Take') {
+            Contact::query()->getConnection()->table('fixture_contacts')
+                ->where('id', $survivor->getKey())
+                ->update(['display_name' => 'Keep']);
+        }
+    });
+
+    expect(fn () => app(MergeExecutor::class)->execute(
+        $context,
+        $definition,
+        $plan->operationId,
+        ['display_name' => 'source'],
+    ))->toThrow(function (DomainConflict $exception): void {
+        expect($exception->getMessage())->toContain('did not keep the reviewed value');
+    });
+
+    Contact::flushEventListeners();
+
+    $survivor->refresh();
+    $source->refresh();
+
+    expect($survivor->display_name)->toBe('Keep')
+        ->and($source->trashed())->toBeFalse()
+        ->and(MergeRecord::on($engine)->count())->toBe(0);
+})->with('engines');
+
+it('rolls back when a child does not stay with the survivor', function (string $engine) {
+    $this->bootEngine($engine);
+
+    $definition = $this->makeDefinition();
+    $context = $this->contextFor($definition);
+
+    $survivor = $this->makeContact(['reference' => 'ONE']);
+    $source = $this->makeContact(['reference' => 'ONE']);
+
+    $note = $this->addNote($source, 'child');
+
+    $plan = $this->planFor($context, $definition, $survivor, $source);
+
+    // An observer that points the child back at the retired source: the merge's
+    // own re-read happens before this, so only the postcondition sees it.
+    Note::saved(function (Note $saved) use ($source): void {
+        Note::query()->getConnection()->table('fixture_notes')
+            ->where('id', $saved->getKey())
+            ->update(['contact_id' => $source->getKey()]);
+    });
+
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+        ->toThrow(function (DomainConflict $exception): void {
+            expect($exception->getMessage())->toContain('still points at the retired source');
+        });
+
+    Note::flushEventListeners();
+
+    $note->refresh();
+
+    expect($note->contact_id)->toBe($source->getKey())
+        ->and($source->refresh()->trashed())->toBeFalse()
+        ->and(MergeRecord::on($engine)->count())->toBe(0);
+})->with('engines');

@@ -929,12 +929,8 @@ final class MergeExecutor
      * strings on purpose: converting them back through a float would lose
      * exactly what the typed form exists to protect.
      */
-    private function valueFromTyped(mixed $typed): mixed
+    private function valueFromTyped(array $typed): mixed
     {
-        if (! is_array($typed)) {
-            return null;
-        }
-
         $type = $typed['type'] ?? null;
         $value = $typed['value'] ?? null;
 
