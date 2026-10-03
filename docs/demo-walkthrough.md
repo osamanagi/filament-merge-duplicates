@@ -80,7 +80,44 @@ differences noted at the end.
   `->viteTheme('resources/css/app.css')` plus `npm install && npm run build` fixes it.
 - The panel path is `/`, so the login page is `/login`, not `/admin/login`.
 
+## Seeded states
+
+`database/seeders/MergeDuplicatesDemoSeeder.php` in the Filament 5 demo produces every
+state the walkthrough has to show, so nothing is hand-edited before a review:
+
+| State | How it is produced | What the pages show |
+| --- | --- | --- |
+| Mergeable | Two customers with the same name and the same phone | Confirmation needs no choice and is enabled |
+| Conflicting choice | Two customers with the same name and different phones | The comparison requires a value for the phone |
+| Dismissed | A third pair, dismissed after the scan | The pair is absent from the list and stays absent after a rescan |
+| Blocked | Authors: the model is not soft-deletable, so the definition is detection-only | The comparison states that merging is not enabled and reports `invalid_configuration` |
+| Blank | Employees are scanned with no duplicate to find | The list reports an empty result with the scan time, not "never scanned" |
+
+The seeder scans through `filament-merge-duplicates:scan … --sync` with the same panel
+and actor the UI uses, because both are part of the scope identity. It is idempotent:
+rows are keyed on their unique column and the dismissed pair is dismissed again on every
+run.
+
 ## Observed results
+
+### The queued path, drained by a real worker
+
+The Filament 5 demo runs `QUEUE_CONNECTION=database`, so the review page's scan control
+queues work instead of doing it inside the request. With no worker running, the page
+reports "Scanning for duplicates…" and keeps the previously published groups on screen.
+Running `php artisan queue:work --stop-when-empty` then processes `ProcessScanChunk` chunk
+by chunk, each job re-dispatching itself while records remain, and the page afterwards
+reports the new completion time with the groups in place. Before the `ScanStarter` fix this
+run would have queued a scan that nothing ever drained.
+
+The dismissed pair was suppressed before that rescan and stayed suppressed after it, which
+is the behaviour the plan asks for: a dismissal survives a scan that finds the same pair
+unchanged.
+
+The Filament 4 demo was moved to the same configuration and proves the same path there:
+the CLI queued one job, `queue:work --stop-when-empty` drained two chunks, the queue
+ended empty and the scan row finished as `succeeded` with 1001 indexed records. Both
+installations therefore run queued scans, not just inline ones.
 
 Filament 5.9.0 (`demo_merge`), definition `shop-customers`:
 
@@ -124,11 +161,6 @@ majors; the only markup difference observed is the surrounding panel chrome
 
 ## Still open after this walkthrough
 
-- **Render hooks.** No genuine use in the package yet; deferred to the demo phase by
-  agreement. The demo banner is therefore not yet rendered above a resource table.
-- **A queued (asynchronous) scan.** Both demos run `QUEUE_CONNECTION=sync`, so the browser
-  path is queued but drained inline. A worker-based run (`database` queue plus
-  `php artisan queue:work`) still has to be walked through once, which also exercises
-  `failed()` and retry handling for the chunk job.
-- **Dismissal journey.** "Not duplicates" was not exercised in the browser on either major;
-  dismissal is covered by tests and is on the M6 list.
+- **A GIF or short video of the journey.** Recorded by hand, not by the test suite.
+- **Beta feedback.** Three real applications with different schemas; nothing in the
+  package substitutes for that.

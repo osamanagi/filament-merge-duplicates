@@ -162,7 +162,7 @@ ran 327 passed, 1 skipped, 1050 assertions each.
 
 | Milestone | Must re-verify |
 | --- | --- |
-| M5 | Page/route/navigation, Livewire state, Filament action/modal and asset surfaces: verified on both majors (see above). Manual browser review completed on Filament 5.9.0 and Filament 4.11.6 demo installations (`docs/demo-walkthrough.md`). Render hooks are outstanding, deferred to the demo phase by agreement. |
+| M5 | Page/route/navigation, Livewire state, Filament action/modal, render hook and asset surfaces: verified on both majors (see above). Manual browser review completed on Filament 5.9.0 and Filament 4.11.6 demo installations (`docs/demo-walkthrough.md`). |
 | M6 | A Filament 4 → 5 upgrade against existing package data, without a data reset |
 | M7 | Full matrix, resolved version range matching the published constraints |
 
