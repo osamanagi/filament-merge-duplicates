@@ -1,8 +1,10 @@
 # Support matrix
 
-Status: M0. Nothing below is available yet; this records the v1.0 support
-boundary that implementation must honour, and the blockers that must produce a
-clear message rather than a guessed strategy.
+Status: the boundaries below are implemented as described; detection, review, merge and
+audit all work on both Filament majors. What is still missing is listed under "Explicit
+non-claims" rather than left implicit. See [docs/test-case-map.md](test-case-map.md) for
+the acceptance evidence and [docs/demo-walkthrough.md](demo-walkthrough.md) for the
+hands-on demo on both majors.
 
 ## Platform
 
@@ -97,6 +99,14 @@ capped (default 500 children per pair). Above the cap the merge is blocked with 
 explanation instead of truncating. Bulk SQL is a future opt-in strategy with
 different event semantics.
 
+## Housekeeping
+
+| Row | Pruned by | Notes |
+| --- | --- | --- |
+| Merge previews | `filament-merge-duplicates:prune` | Also refused as stale on read once expired, so pruning is housekeeping, not correctness. |
+| Scans, memberships, dismissals | Nothing yet | `retention.scans_days` is reserved and unconsumed; these rows accumulate until a prune path is written. |
+| Merge ledger and its audit payload | Never | A terminal source mapping has to outlive the record it refers to. |
+
 ## Explicit non-claims
 
 - No generic support for every Eloquent model; unsupported cases stay visible with
@@ -104,3 +114,8 @@ different event semantics.
 - No "zero data loss" claim. The guarantee is conditional on the host upholding
   the WriterGuard protocol and on the declared reference inventory being complete.
 - Soft-delete restore is **not** an unmerge.
+- Scans, memberships and dismissals are **not pruned**: only expired previews are, and
+  `retention.scans_days` currently does nothing.
+- Merge execution is **not** queued: it runs inside the request that confirms it. Scans
+  are queued and chunked.
+- There is **no bulk or automatic merge**, and no unmerge.

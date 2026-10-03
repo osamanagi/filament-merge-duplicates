@@ -44,7 +44,27 @@ body:
     attributes:
       label: Laravel Version
       description: What version of Laravel are you running? Please be as specific as possible
-      placeholder: 9.0.0
+      placeholder: 12.0.0
+    validations:
+      required: true
+  - type: input
+    id: filament-version
+    attributes:
+      label: Filament Version
+      description: This package ships one release line for both majors, so the major matters. Please give the exact version.
+      placeholder: 4.14.0 or 5.9.0
+    validations:
+      required: true
+  - type: dropdown
+    id: database-engine
+    attributes:
+      label: Which database engine is the mergeable model on?
+      description: Detection runs on any engine, but merge execution refuses a driver that cannot provide the row locks it needs.
+      options:
+        - MySQL
+        - PostgreSQL
+        - SQLite (detection only)
+        - Other
     validations:
       required: true
   - type: dropdown
