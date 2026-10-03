@@ -1,14 +1,44 @@
 {{--
     Merge preview page.
 
-    Plain semantic markup with utility classes, for the same cross-major reason
-    as the banner and the review page. Every value that came from a record is
-    escaped; the comparison is stacked and reflows, and choices are real radio
-    inputs with labels so keyboard and screen-reader use is possible without a
-    pointer.
+    Plain semantic markup, for the same cross-major reason as the banner and the
+    review page: no Filament Blade component and no version-specific API, so one
+    release line renders the same on Filament 4 and 5. The comparison's own visual
+    language lives in the package stylesheet rather than in utility classes,
+    because the panel's compiled CSS only carries the utilities its own components
+    use.
+
+    The comparison reads as a diff:
+
+    - a green row is a value that survives the merge,
+    - a red row is a value that does not,
+    - every row also carries the sign and the word for it (`+ Kept`, `− Not kept`,
+      `= Same`, `· Empty`), so the meaning never depends on colour alone - which is
+      also what keeps it usable in forced-colours mode and for a colour-blind
+      reader.
+
+    Every value that came from a record is escaped, every value keeps its own
+    reading direction, and the choices are real radio inputs inside labels, so the
+    whole page works without a pointer.
 --}}
 @php
     $translation = 'filament-merge-duplicates::merge-duplicates.merge.';
+
+    $chipClasses = [
+        'identical' => 'fi-merge-chip--same',
+        'different' => 'fi-merge-chip--different',
+        'source_only' => 'fi-merge-chip--soft',
+        'survivor_only' => 'fi-merge-chip--soft',
+        'empty' => 'fi-merge-chip--muted',
+    ];
+
+    $statusKeys = [
+        'identical' => 'status_identical',
+        'different' => 'status_different',
+        'source_only' => 'status_source_only',
+        'survivor_only' => 'status_survivor_only',
+        'empty' => 'status_empty',
+    ];
 @endphp
 
 <div class="fi-merge-duplicates-merge space-y-6">
@@ -21,6 +51,21 @@
             <p class="text-sm text-gray-600 dark:text-gray-400">
                 {{ trans($translation . 'survivor_reason', ['reason' => $survivorReason]) }}
             </p>
+        @endif
+
+        @if ($matchReasons !== [] && ! $merged && $configurationError === null)
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                    {{ trans($translation . 'match_reasons_heading') }}
+                </span>
+
+                @foreach ($matchReasons as $reason)
+                    <span class="fi-merge-chip fi-merge-chip--soft">
+                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.7-9.3a1 1 0 00-1.4-1.4L9 10.6 7.7 9.3a1 1 0 00-1.4 1.4l2 2a1 1 0 001.4 0l4-4z" clip-rule="evenodd" /></svg>
+                        {{ $reason }}
+                    </span>
+                @endforeach
+            </div>
         @endif
     </header>
 
@@ -58,39 +103,51 @@
             </div>
         </section>
     @else
-        <section class="space-y-3 rounded-xl p-4 ring-1 ring-gray-950/5 dark:ring-white/10">
-            <h2 class="text-sm font-semibold text-gray-950 dark:text-white">
-                {{ trans($translation . 'survivor_heading') }}
-            </h2>
+        <section class="fi-merge-panel space-y-3">
+            <div class="space-y-1">
+                <h2 class="text-sm font-semibold text-gray-950 dark:text-white">
+                    {{ trans($translation . 'survivor_heading') }}
+                </h2>
 
-            <p class="text-xs text-gray-600 dark:text-gray-400">
-                {{ trans($translation . 'survivor_hint') }}
-            </p>
+                <p class="text-xs text-gray-600 dark:text-gray-400">
+                    {{ trans($translation . 'survivor_hint') }}
+                </p>
+            </div>
 
             <fieldset class="space-y-2">
-                <legend class="sr-only">{{ trans($translation . 'survivor_heading') }}</legend>
+                <legend class="fi-merge-visually-hidden">{{ trans($translation . 'survivor_heading') }}</legend>
 
-                <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-950 dark:text-white">
+                <label class="flex cursor-pointer items-start gap-3 rounded-xl p-3 ring-1 ring-gray-950/10 hover:bg-gray-50 has-[:checked]:ring-2 has-[:checked]:ring-primary-500 dark:ring-white/15 dark:hover:bg-white/5">
                     <input
                         type="radio"
                         name="fi-merge-survivor"
                         value="{{ $survivorValue }}"
                         wire:click="setSurvivor('{{ $survivorValue }}')"
                         @checked(true)
-                        class="text-primary-600 focus-visible:ring-2 focus-visible:ring-primary-500"
+                        class="mt-0.5 text-primary-600 focus-visible:ring-2 focus-visible:ring-primary-500"
                     >
-                    <span>{{ trans($translation . 'keep', ['title' => $survivorTitle]) }}</span>
+                    <span class="min-w-0 space-y-0.5">
+                        <span class="block text-sm font-semibold text-gray-950 dark:text-white">
+                            {{ trans($translation . 'keep', ['title' => $survivorTitle]) }}
+                        </span>
+                        <span class="fi-merge-value block text-xs text-gray-500 dark:text-gray-400">#{{ $survivorValue }}</span>
+                    </span>
                 </label>
 
-                <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-950 dark:text-white">
+                <label class="flex cursor-pointer items-start gap-3 rounded-xl p-3 ring-1 ring-gray-950/10 hover:bg-gray-50 has-[:checked]:ring-2 has-[:checked]:ring-primary-500 dark:ring-white/15 dark:hover:bg-white/5">
                     <input
                         type="radio"
                         name="fi-merge-survivor"
                         value="{{ $sourceValue }}"
                         wire:click="setSurvivor('{{ $sourceValue }}')"
-                        class="text-primary-600 focus-visible:ring-2 focus-visible:ring-primary-500"
+                        class="mt-0.5 text-primary-600 focus-visible:ring-2 focus-visible:ring-primary-500"
                     >
-                    <span>{{ trans($translation . 'keep', ['title' => $sourceTitle]) }}</span>
+                    <span class="min-w-0 space-y-0.5">
+                        <span class="block text-sm font-semibold text-gray-950 dark:text-white">
+                            {{ trans($translation . 'keep', ['title' => $sourceTitle]) }}
+                        </span>
+                        <span class="fi-merge-value block text-xs text-gray-500 dark:text-gray-400">#{{ $sourceValue }}</span>
+                    </span>
                 </label>
             </fieldset>
         </section>
@@ -100,37 +157,143 @@
                 {{ trans($translation . 'fields_heading') }}
             </h2>
 
+            <div class="fi-merge-summary">
+                <span class="fi-merge-chip fi-merge-chip--muted">
+                    {{ trans($translation . 'summary_compared', ['count' => $comparisonSummary['total']]) }}
+                </span>
+
+                @if ($comparisonSummary['identical'] > 0)
+                    <span class="fi-merge-chip fi-merge-chip--same">
+                        {{ trans($translation . 'summary_identical', ['count' => $comparisonSummary['identical']]) }}
+                    </span>
+                @endif
+
+                @if ($comparisonSummary['different'] > 0)
+                    <span class="fi-merge-chip fi-merge-chip--different">
+                        {{ trans($translation . 'summary_different', ['count' => $comparisonSummary['different']]) }}
+                    </span>
+                @endif
+
+                @if ($comparisonSummary['oneSided'] > 0)
+                    <span class="fi-merge-chip fi-merge-chip--soft">
+                        {{ trans($translation . 'summary_one_sided', ['count' => $comparisonSummary['oneSided']]) }}
+                    </span>
+                @endif
+
+                @if ($comparisonSummary['empty'] > 0)
+                    <span class="fi-merge-chip fi-merge-chip--muted">
+                        {{ trans($translation . 'summary_empty', ['count' => $comparisonSummary['empty']]) }}
+                    </span>
+                @endif
+            </div>
+
             @foreach ($differences as $difference)
-                <div class="space-y-2 rounded-xl p-4 ring-1 ring-gray-950/5 dark:ring-white/10">
-                    <div class="flex flex-wrap items-center gap-2">
+                @php
+                    // Which side survives this field right now: the operator's choice if
+                    // they made one, the proposal otherwise. Derived from the live choice
+                    // state so it is never stale after a rebuild.
+                    $keptSide = $difference['requiresChoice']
+                        ? (($choices[$difference['field']] ?? null) === 'source' ? 'source' : 'survivor')
+                        : ($difference['proposedFromSource'] ? 'source' : 'survivor');
+                @endphp
+
+                <article class="fi-merge-diff">
+                    <div class="fi-merge-diff__head">
                         <h3 class="text-sm font-semibold text-gray-950 dark:text-white">{{ $difference['label'] }}</h3>
 
-                        @if ($difference['requiresChoice'])
-                            <span class="inline-flex items-center rounded-md bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700 dark:bg-warning-400/10 dark:text-warning-400">
-                                {{ trans($translation . 'choice_required') }}
-                            </span>
-                        @elseif ($difference['proposedFromSource'])
-                            <span class="inline-flex items-center rounded-md bg-info-50 px-2 py-0.5 text-xs font-medium text-info-700 dark:bg-info-400/10 dark:text-info-400">
-                                {{ trans($translation . 'proposed_from_source') }}
-                            </span>
+                        <span @class(['fi-merge-chip', $chipClasses[$difference['status']]])>
+                            @switch($difference['status'])
+                                @case('identical')
+                                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.8 3.8 6.8-6.8a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+                                    @break
+                                @case('different')
+                                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v9a1 1 0 11-2 0V3a1 1 0 011-1zm0 14a1.25 1.25 0 100-2.5A1.25 1.25 0 0010 16z" clip-rule="evenodd" /></svg>
+                                    @break
+                                @default
+                                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3a1 1 0 102 0V7zm-1 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>
+                            @endswitch
+
+                            {{ trans($translation . $statusKeys[$difference['status']]) }}
+                        </span>
+
+                        @if ($difference['audited'])
+                            <span class="fi-merge-chip fi-merge-chip--muted">{{ trans($translation . 'audited_marker') }}</span>
                         @endif
                     </div>
 
-                    <dl class="grid gap-2 sm:grid-cols-2">
-                        <div class="space-y-1">
-                            <dt class="text-xs text-gray-500 dark:text-gray-400">{{ trans($translation . 'survivor_value', ['title' => $survivorTitle]) }}</dt>
-                            <dd class="fi-merge-value break-words text-sm text-gray-950 dark:text-white">{{ $difference['survivorValue'] }}</dd>
-                        </div>
+                    @if ($difference['status'] === 'identical')
+                        <dl class="fi-merge-diff__rows">
+                            <div class="fi-merge-diff-row fi-merge-diff-row--same">
+                                <dt class="fi-merge-diff-row__side">
+                                    <span class="fi-merge-diff-row__gutter" aria-hidden="true">=</span>
+                                    <span class="fi-merge-chip fi-merge-chip--same">{{ trans($translation . 'side_same') }}</span>
+                                </dt>
+                                <dd class="fi-merge-diff-row__value fi-merge-value">{{ $difference['survivorValue'] }}</dd>
+                            </div>
+                        </dl>
+                    @elseif ($difference['status'] === 'different')
+                        <dl class="fi-merge-diff__rows">
+                            <div class="fi-merge-diff-row fi-merge-diff-row--kept">
+                                <dt class="fi-merge-diff-row__side">
+                                    <span class="fi-merge-diff-row__gutter" aria-hidden="true">+</span>
+                                    <span class="fi-merge-chip fi-merge-chip--same">{{ trans($translation . 'side_kept') }}</span>
+                                    <span class="fi-merge-diff-row__provenance">{{ trans($keptSide === 'survivor' ? $translation . 'survivor_value' : $translation . 'source_value', ['title' => $keptSide === 'survivor' ? $survivorTitle : $sourceTitle]) }}</span>
+                                </dt>
+                                <dd class="fi-merge-diff-row__value fi-merge-value">{{ $keptSide === 'survivor' ? $difference['survivorValue'] : $difference['sourceValue'] }}</dd>
+                            </div>
 
-                        <div class="space-y-1">
-                            <dt class="text-xs text-gray-500 dark:text-gray-400">{{ trans($translation . 'source_value', ['title' => $sourceTitle]) }}</dt>
-                            <dd class="fi-merge-value break-words text-sm text-gray-950 dark:text-white">{{ $difference['sourceValue'] }}</dd>
-                        </div>
-                    </dl>
+                            <div class="fi-merge-diff-row fi-merge-diff-row--dropped">
+                                <dt class="fi-merge-diff-row__side">
+                                    <span class="fi-merge-diff-row__gutter" aria-hidden="true">−</span>
+                                    <span class="fi-merge-chip fi-merge-chip--different">{{ trans($translation . 'side_dropped') }}</span>
+                                    <span class="fi-merge-diff-row__provenance">{{ trans($keptSide === 'survivor' ? $translation . 'source_value' : $translation . 'survivor_value', ['title' => $keptSide === 'survivor' ? $sourceTitle : $survivorTitle]) }}</span>
+                                </dt>
+                                <dd class="fi-merge-diff-row__value fi-merge-value">{{ $keptSide === 'survivor' ? $difference['sourceValue'] : $difference['survivorValue'] }}</dd>
+                            </div>
+                        </dl>
+                    @elseif ($difference['status'] === 'source_only')
+                        <dl class="fi-merge-diff__rows">
+                            <div class="fi-merge-diff-row fi-merge-diff-row--kept">
+                                <dt class="fi-merge-diff-row__side">
+                                    <span class="fi-merge-diff-row__gutter" aria-hidden="true">+</span>
+                                    <span class="fi-merge-chip fi-merge-chip--same">{{ trans($translation . 'side_added') }}</span>
+                                    <span class="fi-merge-diff-row__provenance">{{ trans($translation . 'source_value', ['title' => $sourceTitle]) }}</span>
+                                </dt>
+                                <dd class="fi-merge-diff-row__value fi-merge-value">{{ $difference['sourceValue'] }}</dd>
+                            </div>
+                        </dl>
+
+                        <p class="fi-merge-diff__note">
+                            {{ trans($translation . 'will_transfer', ['title' => $survivorTitle]) }}
+                        </p>
+                    @elseif ($difference['status'] === 'survivor_only')
+                        <dl class="fi-merge-diff__rows">
+                            <div class="fi-merge-diff-row fi-merge-diff-row--kept">
+                                <dt class="fi-merge-diff-row__side">
+                                    <span class="fi-merge-diff-row__gutter" aria-hidden="true">=</span>
+                                    <span class="fi-merge-chip fi-merge-chip--same">{{ trans($translation . 'side_kept') }}</span>
+                                    <span class="fi-merge-diff-row__provenance">{{ trans($translation . 'survivor_value', ['title' => $survivorTitle]) }}</span>
+                                </dt>
+                                <dd class="fi-merge-diff-row__value fi-merge-value">{{ $difference['survivorValue'] }}</dd>
+                            </div>
+                        </dl>
+                    @else
+                        <dl class="fi-merge-diff__rows">
+                            <div class="fi-merge-diff-row fi-merge-diff-row--muted">
+                                <dt class="fi-merge-diff-row__side">
+                                    <span class="fi-merge-diff-row__gutter" aria-hidden="true">·</span>
+                                    <span class="fi-merge-chip fi-merge-chip--muted">{{ trans($translation . 'side_empty') }}</span>
+                                </dt>
+                                <dd class="fi-merge-diff-row__value"></dd>
+                            </div>
+                        </dl>
+                    @endif
 
                     @if ($difference['requiresChoice'])
-                        <fieldset class="flex flex-wrap gap-4 pt-1">
-                            <legend class="sr-only">{{ trans($translation . 'choose_for', ['label' => $difference['label']]) }}</legend>
+                        <fieldset class="fi-merge-choice">
+                            <legend class="fi-merge-visually-hidden">{{ trans($translation . 'choose_for', ['label' => $difference['label']]) }}</legend>
+
+                            <span class="fi-merge-chip fi-merge-chip--different">{{ trans($translation . 'choice_required') }}</span>
 
                             <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-950 dark:text-white">
                                 <input
@@ -157,20 +320,23 @@
                             </label>
                         </fieldset>
                     @endif
-                </div>
+                </article>
             @endforeach
         </section>
 
         @if ($relations !== [])
-            <section class="space-y-2" aria-label="{{ trans($translation . 'relations_heading') }}">
+            <section class="fi-merge-panel space-y-2" aria-label="{{ trans($translation . 'relations_heading') }}">
                 <h2 class="text-sm font-semibold text-gray-950 dark:text-white">
                     {{ trans($translation . 'relations_heading') }}
                 </h2>
 
-                <ul class="space-y-1">
+                <ul class="space-y-2">
                     @foreach ($relations as $relation)
-                        <li class="text-sm text-gray-950 dark:text-white">
-                            {{ $relation['summary'] }}
+                        <li class="flex flex-wrap items-center gap-2 text-sm text-gray-950 dark:text-white">
+                            <span @class(['fi-merge-chip', $relation['isNoOp'] ? 'fi-merge-chip--muted' : 'fi-merge-chip--soft'])>
+                                {{ $relation['label'] }}
+                            </span>
+                            <span>{{ $relation['summary'] }}</span>
                         </li>
                     @endforeach
                 </ul>
@@ -191,11 +357,7 @@
             </section>
         @endif
 
-        <p class="text-sm text-warning-700 dark:text-warning-400">
-            {{ $retirementWarning }}
-        </p>
-
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="fi-merge-actions">
             <button
                 type="button"
                 wire:click="confirm"
@@ -216,6 +378,10 @@
                     {{ trans($translation . 'not_duplicates') }}
                 </button>
             @endif
+
+            <p class="fi-merge-actions__note text-warning-700 dark:text-warning-400">
+                {{ $retirementWarning }}
+            </p>
 
             <a href="{{ $reviewUrl }}" class="text-sm font-medium text-primary-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400">
                 {{ trans('filament-merge-duplicates::merge-duplicates.actions.back_to_review') }}

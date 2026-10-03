@@ -36,7 +36,7 @@
     @if ($groups !== [])
         <section class="space-y-4" aria-label="{{ trans($translation . 'groups_heading') }}">
             @foreach ($groups as $group)
-                <article class="space-y-3 rounded-xl p-4 ring-1 ring-gray-950/5 dark:ring-white/10">
+                    <article class="fi-merge-panel space-y-3">
                     <div class="flex flex-wrap items-start justify-between gap-2">
                         <div class="min-w-0">
                             <h2 class="text-sm font-semibold text-gray-950 dark:text-white">
@@ -50,13 +50,13 @@
 
                         <div class="flex flex-wrap items-center gap-2">
                             @if ($group->hasStaleMember())
-                                <span class="inline-flex items-center rounded-md bg-warning-50 px-2 py-1 text-xs font-medium text-warning-700 ring-1 ring-warning-600/20 dark:bg-warning-400/10 dark:text-warning-400 dark:ring-warning-400/30">
+                                <span class="fi-merge-chip fi-merge-chip--caution">
                                     {{ trans($translation . 'stale_badge') }}
                                 </span>
                             @endif
 
                             @unless ($group->isReviewable())
-                                <span class="inline-flex items-center rounded-md bg-danger-50 px-2 py-1 text-xs font-medium text-danger-700 ring-1 ring-danger-600/20 dark:bg-danger-400/10 dark:text-danger-400 dark:ring-danger-400/30">
+                                <span class="fi-merge-chip fi-merge-chip--different">
                                     {{ trans($translation . 'not_reviewable_badge') }}
                                 </span>
                             @endunless
@@ -71,19 +71,19 @@
                                 <span class="fi-merge-value text-xs text-gray-500 dark:text-gray-400">#{{ $member->recordId->value }}</span>
 
                                 @if ($member->missing)
-                                    <span class="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-white/10 dark:text-gray-300">
+                                    <span class="fi-merge-chip fi-merge-chip--muted">
                                         {{ trans($translation . 'member_missing') }}
                                     </span>
                                 @endif
 
                                 @if ($member->retired)
-                                    <span class="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-white/10 dark:text-gray-300">
+                                    <span class="fi-merge-chip fi-merge-chip--muted">
                                         {{ trans($translation . 'member_retired') }}
                                     </span>
                                 @endif
 
                                 @if ($member->changed)
-                                    <span class="inline-flex items-center rounded-md bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700 dark:bg-warning-400/10 dark:text-warning-400">
+                                    <span class="fi-merge-chip fi-merge-chip--caution">
                                         {{ trans($translation . 'member_changed') }}
                                     </span>
                                 @endif

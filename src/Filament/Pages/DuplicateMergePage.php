@@ -6,6 +6,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Model;
+use Nagi\FilamentMergeDuplicates\Data\ValueCodec;
 use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
 use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
 use Nagi\FilamentMergeDuplicates\Exceptions\MergeDuplicatesException;
@@ -301,6 +302,7 @@ final class DuplicateMergePage extends Page
             'sourceTitle' => $this->sourceTitle,
             'survivorReason' => $this->survivorReason,
             'differences' => $this->differences,
+            'comparisonSummary' => $this->comparisonSummary($this->differences),
             'relations' => $this->relations,
             'fatalBlockers' => $this->fatalBlockers,
             'choiceFields' => $this->choiceFields,
@@ -406,6 +408,7 @@ final class DuplicateMergePage extends Page
             $display[] = [
                 'field' => $difference->field,
                 'label' => $difference->label,
+                'status' => $this->displayStatus($difference),
                 'requiresChoice' => $difference->resolution->requiresChoice(),
                 'proposedFromSource' => $difference->resolution === FieldResolution::TakeSource,
                 'survivorValue' => $this->displayValue($difference->survivorValue),
@@ -416,6 +419,63 @@ final class DuplicateMergePage extends Page
         }
 
         return $display;
+    }
+
+    /**
+     * Which of the four comparison states a field is in, so the view can show a
+     * diff instead of two unlabelled columns:
+     *
+     * - `identical`: the same value on both records, so nothing moves
+     * - `different`: a real disagreement that needs an explicit choice
+     * - `source_only`: only the retiring record has a value, proposed for transfer
+     * - `survivor_only`: only the kept record has a value
+     * - `empty`: nothing on either record
+     *
+     * The equality test is the one the merge policy itself uses, so the page can
+     * never call two values identical when the executor would not.
+     */
+    private function displayStatus(FieldDifference $difference): string
+    {
+        if ($difference->resolution === FieldResolution::ChoiceRequired) {
+            return 'different';
+        }
+
+        if ($difference->resolution === FieldResolution::BothMissing) {
+            return 'empty';
+        }
+
+        if ($difference->resolution === FieldResolution::TakeSource) {
+            return 'source_only';
+        }
+
+        $identical = ValueCodec::equal(
+            $difference->survivorValue,
+            $difference->sourceValue,
+            $difference->field,
+            $this->duplicateDefinitionId(),
+        );
+
+        return $identical ? 'identical' : 'survivor_only';
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $differences
+     * @return array<string, int>
+     */
+    private function comparisonSummary(array $differences): array
+    {
+        $summary = ['total' => count($differences), 'identical' => 0, 'different' => 0, 'oneSided' => 0, 'empty' => 0];
+
+        foreach ($differences as $difference) {
+            match ($difference['status']) {
+                'identical' => $summary['identical']++,
+                'different' => $summary['different']++,
+                'empty' => $summary['empty']++,
+                default => $summary['oneSided']++,
+            };
+        }
+
+        return $summary;
     }
 
     /**

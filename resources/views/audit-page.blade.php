@@ -34,8 +34,8 @@
     @else
         <dl class="space-y-3">
             @foreach ($entries as $key => $value)
-                <div class="space-y-1 rounded-xl p-4 ring-1 ring-gray-950/5 dark:ring-white/10">
-                    <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <div class="fi-merge-keyvalue">
+                    <dt class="fi-merge-keyvalue__key">
                         {{ $key }}
                     </dt>
                     <dd class="fi-merge-value whitespace-pre-wrap break-words text-sm text-gray-950 dark:text-white">{{ $this->formatValue($value) }}</dd>

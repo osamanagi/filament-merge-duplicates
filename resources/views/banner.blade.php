@@ -46,7 +46,7 @@
                 {{ $banner->lastScanLabel() }}
 
                 @if ($banner->lastCompletedAt !== null)
-                    <span class="sr-only">.</span>{{ $banner->staleNotice() }}
+                    <span class="fi-merge-visually-hidden">.</span>{{ $banner->staleNotice() }}
                 @endif
             </p>
 
@@ -55,7 +55,7 @@
             @endif
 
             @if ($banner->groupsCount > 0)
-                <p class="sr-only">{{ $banner->countsVisibleOnlyNotice() }}</p>
+                <p class="fi-merge-visually-hidden">{{ $banner->countsVisibleOnlyNotice() }}</p>
             @endif
         </div>
 

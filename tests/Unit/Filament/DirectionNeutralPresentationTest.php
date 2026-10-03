@@ -54,10 +54,11 @@ it('styles with logical direction rather than left and right', function () {
         'padding-right',
         'border-left',
         'border-right',
-        'text-align',
-        'left:',
-        'right:',
     ];
+
+    // The property itself is fine - only a physical alignment value is not,
+    // because `center` means the same thing in both directions.
+    $physicalAlignment = '/text-align\s*:\s*(left|right)/';
 
     $files = [
         'resources/views/banner.blade.php',
@@ -71,6 +72,10 @@ it('styles with logical direction rather than left and right', function () {
 
     foreach ($files as $file) {
         $contents = stripPresentationComments(packagePresentationFile($file));
+
+        if (preg_match($physicalAlignment, $contents) === 1) {
+            $offending[] = $file . ' aligns to a physical side';
+        }
 
         foreach ($tokens as $token) {
             if (str_contains($contents, $token)) {
