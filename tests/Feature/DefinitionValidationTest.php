@@ -42,7 +42,7 @@ function validateDefinition(array $config): ConfigurationReport
 function blockerMessages(ConfigurationReport $report): string
 {
     return implode(' | ', array_map(
-        static fn ($issue): string => $issue->message,
+        static fn($issue): string => $issue->message,
         $report->blockers(),
     ));
 }
@@ -472,7 +472,7 @@ it('warns rather than blocks when the engine cannot execute merges', function ()
     $report = (new DefinitionValidator)->validate(new ContactDuplicates);
 
     $warnings = implode(' ', array_map(
-        static fn ($issue): string => $issue->message,
+        static fn($issue): string => $issue->message,
         $report->warnings(),
     ));
 
@@ -499,7 +499,7 @@ it('rejects a duplicate definition ID', function () {
     $registry = new DefinitionRegistry;
     $registry->register(new ContactDuplicates);
 
-    expect(fn () => $registry->register(new ContactDuplicates))
+    expect(fn() => $registry->register(new ContactDuplicates))
         ->toThrow(InvalidConfiguration::class);
 });
 
@@ -507,7 +507,7 @@ it('refuses to resolve an unknown definition ID', function () {
     $registry = new DefinitionRegistry;
 
     expect($registry->has('nope'))->toBeFalse()
-        ->and(fn () => $registry->get('nope'))->toThrow(InvalidConfiguration::class);
+        ->and(fn() => $registry->get('nope'))->toThrow(InvalidConfiguration::class);
 });
 
 it('resolves a definition registered by class name without panel middleware', function () {
@@ -528,12 +528,12 @@ it('holds two unrelated definitions with independent rules and fields', function
     expect(array_keys($registry->all()))->toBe(['fixture-contacts', 'fixture-inventory-items'])
         ->and($contacts->label())->toBe('Contact')
         ->and($items->label())->toBe('Inventory item')
-        ->and(array_map(static fn ($rule) => $rule->id(), $contacts->matchingRules()))
+        ->and(array_map(static fn($rule) => $rule->id(), $contacts->matchingRules()))
         ->toBe(['reference', 'email', 'name-and-email'])
-        ->and(array_map(static fn ($rule) => $rule->id(), $items->matchingRules()))
+        ->and(array_map(static fn($rule) => $rule->id(), $items->matchingRules()))
         ->toBe(['sku'])
-        ->and(array_map(static fn ($field) => $field->name(), $contacts->fields()))
-        ->not->toBe(array_map(static fn ($field) => $field->name(), $items->fields()));
+        ->and(array_map(static fn($field) => $field->name(), $contacts->fields()))
+        ->not->toBe(array_map(static fn($field) => $field->name(), $items->fields()));
 });
 
 /*
@@ -590,7 +590,7 @@ it('blocks a matching rule that cannot be signed', function () {
 
     expect(blockerMessages($report))->toContain('cannot be signed')
         ->and(blockerMessages($report))->toContain('no stable signature')
-        ->and(array_map(static fn ($issue) => $issue->path, $report->blockers()))
+        ->and(array_map(static fn($issue) => $issue->path, $report->blockers()))
         ->toContain('matchingRules.unstable');
 });
 
@@ -700,6 +700,6 @@ it('blocks a definition whose connection cannot be read', function () {
     $report = (new DefinitionValidator)->validate($definition);
 
     expect(blockerMessages($report))->toContain('the connection could not be resolved')
-        ->and(array_map(static fn ($issue) => $issue->path, $report->blockers()))
+        ->and(array_map(static fn($issue) => $issue->path, $report->blockers()))
         ->toContain('connection');
 });

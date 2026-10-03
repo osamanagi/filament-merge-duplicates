@@ -62,7 +62,7 @@ function reviewPageDefinition(
         'label' => $label ?? 'Record',
         'recordTitleAttribute' => $titleAttribute,
         'authorizer' => new AbilityMapAuthorizer(
-            array_map(static fn (string $ability): Ability => Ability::from($ability), $abilities),
+            array_map(static fn(string $ability): Ability => Ability::from($ability), $abilities),
             'actor-1',
         ),
     ]);
@@ -432,8 +432,8 @@ it('serves two unrelated definitions from one panel', function () {
 it('validates the definition IDs a panel is given', function () {
     $plugin = FilamentMergeDuplicatesPlugin::make();
 
-    expect(fn () => $plugin->definitions([123]))->toThrow(InvalidConfiguration::class)
-        ->and(fn () => $plugin->definitions(['']))->toThrow(InvalidConfiguration::class);
+    expect(fn() => $plugin->definitions([123]))->toThrow(InvalidConfiguration::class)
+        ->and(fn() => $plugin->definitions(['']))->toThrow(InvalidConfiguration::class);
 
     $plugin->definitions(['fixture-a', 'fixture-a', 'fixture-b']);
 
@@ -446,7 +446,7 @@ it('requires a host using the suggestions trait to supply a definition ID', func
         use HasDuplicateSuggestions;
     };
 
-    expect(fn () => $host->duplicateDefinition())->toThrow(InvalidConfiguration::class);
+    expect(fn() => $host->duplicateDefinition())->toThrow(InvalidConfiguration::class);
 });
 
 it('renders a host scan action as markup once groups exist', function () {
