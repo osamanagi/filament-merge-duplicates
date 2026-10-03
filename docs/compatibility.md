@@ -138,7 +138,10 @@ are `tests/Feature/DuplicateMergePageTest.php`.
 M5 slice 6 registers one package stylesheet through `FilamentAsset::register` and
 asserts the file the asset points at exists (`tests/Feature/AssetRegistrationTest.php`).
 The stylesheet does not import Filament's theme - the panel already ships it - and adds
-only focus, forced-colours and print robustness. The UUID-keyed, non-soft-deleting
+only four things the panel does not guarantee: a visible focus fallback, a
+forced-colours border, print behaviour, and isolation of record values from the
+interface direction so a value such as `+1-555-0199` keeps its own reading order in
+an Arabic panel. The UUID-keyed, non-soft-deleting
 fixture is driven through the same pages in
 `tests/Feature/FilamentTwoModelJourneyTest.php`, which also checks that record markup
 is escaped. `tests/Execution/MergePageJourneyTest.php` then confirms a merge through
