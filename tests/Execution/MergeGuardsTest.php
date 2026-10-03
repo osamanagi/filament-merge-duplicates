@@ -1,8 +1,11 @@
 <?php
 
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Event;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
 use Nagi\FilamentMergeDuplicates\Data\RecordId;
+use Nagi\FilamentMergeDuplicates\Events\MergeFailed;
 use Nagi\FilamentMergeDuplicates\Exceptions\DomainConflict;
 use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
 use Nagi\FilamentMergeDuplicates\Exceptions\RecordUnavailable;
@@ -287,6 +290,49 @@ it('rolls back when a host observer reverts a written field', function (string $
     expect($survivor->display_name)->toBe('Keep')
         ->and($source->trashed())->toBeFalse()
         ->and(MergeRecord::on($engine)->count())->toBe(0);
+})->with('engines');
+
+it('rolls back when a host observer performs a write the database refuses', function (string $engine) {
+    $this->bootEngine($engine);
+
+    Event::fake([MergeFailed::class]);
+
+    $definition = $this->makeDefinition();
+    $context = $this->contextFor($definition);
+
+    $survivor = $this->makeContact(['reference' => 'ONE']);
+    $source = $this->makeContact(['reference' => 'ONE']);
+
+    $this->addNote($source, 'child');
+
+    $plan = $this->planFor($context, $definition, $survivor, $source);
+
+    // A host observer with a bug: the write it makes on the child is rejected by
+    // the database. The merge must abort on it rather than swallow it, and the
+    // failure is reported with a code that says it was not one of ours.
+    Note::saved(function (Note $saved): void {
+        Note::query()->getConnection()->table('fixture_notes')->insert([
+            'contact_id' => $saved->getKey(),
+            'body' => $saved->body,
+            'no_such_column' => 1,
+        ]);
+    });
+
+    expect(fn () => app(MergeExecutor::class)->execute($context, $definition, $plan->operationId))
+        ->toThrow(QueryException::class);
+
+    Note::flushEventListeners();
+
+    $source->refresh();
+
+    expect($source->trashed())->toBeFalse()
+        ->and(MergeRecord::on($engine)->count())->toBe(0);
+
+    Event::assertDispatched(
+        MergeFailed::class,
+        fn (MergeFailed $event): bool => $event->operationId === $plan->operationId
+            && $event->errorCode === 'unexpected_error',
+    );
 })->with('engines');
 
 it('rolls back when a child does not stay with the survivor', function (string $engine) {

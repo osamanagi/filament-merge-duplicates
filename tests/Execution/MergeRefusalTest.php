@@ -367,6 +367,53 @@ it('skips the history entries it cannot use instead of failing the replay', func
         ->and($result->movedCounts)->toBe([]);
 })->with('engines');
 
+it('refuses a replay confirmed with choices the committed operation did not use', function (string $engine) {
+    $this->bootEngine($engine);
+
+    [$definition, $context, $plan] = $this->refusalPlan();
+
+    // The stored history holds no usable choices, so a confirmation that names
+    // one is a different decision than the one that was committed.
+    $this->recordOperation($engine, $definition, $plan->operationId, [
+        'fields' => 'not-a-list',
+        'relations' => [],
+    ]);
+
+    expect(fn () => app(MergeExecutor::class)->execute(
+        $context,
+        $definition,
+        $plan->operationId,
+        ['reference' => 'source'],
+    ))->toThrow(function (DomainConflict $exception): void {
+        expect($exception->getMessage())->toContain('already committed with different choices');
+    });
+})->with('engines');
+
+it('reads the committed choices back from the history it can use', function (string $engine) {
+    $this->bootEngine($engine);
+
+    [$definition, $context, $plan] = $this->refusalPlan();
+
+    // One unusable entry among the usable ones: it is skipped, and the remaining
+    // choice is what the replay is compared against.
+    $this->recordOperation($engine, $definition, $plan->operationId, [
+        'fields' => [
+            'not-an-entry',
+            ['field' => 'reference', 'choice' => 'source'],
+        ],
+        'relations' => [],
+    ]);
+
+    $result = app(MergeExecutor::class)->execute(
+        $context,
+        $definition,
+        $plan->operationId,
+        ['reference' => 'source'],
+    );
+
+    expect($result->replayed)->toBeTrue();
+})->with('engines');
+
 it('refuses a merge whose declared children changed after the preview', function (string $engine) {
     $this->bootEngine($engine);
 
