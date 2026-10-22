@@ -135,6 +135,10 @@ final class HasManyTransfer
             ));
         }
 
+        if ($relation->getLocalKeyName() !== $source->getKeyName()) {
+            throw new UnsupportedRelation('HasMany transfers require the parent primary key as the local key.');
+        }
+
         return $relation;
     }
 
@@ -150,7 +154,7 @@ final class HasManyTransfer
         }
 
         /** @var iterable<int, Model> $children */
-        $children = $query->get()->all();
+        $children = $query->limit($this->maxChildrenPerMerge + 1)->get()->all();
 
         return $children;
     }

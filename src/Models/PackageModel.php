@@ -16,6 +16,6 @@ abstract class PackageModel extends Model
 {
     public function getConnectionName(): ?string
     {
-        return config('merge-duplicates.connection') ?: parent::getConnectionName();
+        return parent::getConnectionName() ?? config('merge-duplicates.connection');
     }
 }

@@ -2,7 +2,6 @@
 
 namespace Nagi\FilamentMergeDuplicates\Scanning;
 
-use Illuminate\Database\UniqueConstraintViolationException;
 use Nagi\FilamentMergeDuplicates\Contracts\ContextResolver;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
@@ -65,18 +64,8 @@ final class ScopeManager
             'model_alias' => $definition->model(),
         ];
 
-        $existing = ScopeRecord::on($context->connection)->where($attributes)->first();
-
-        if ($existing !== null) {
-            return $existing;
-        }
-
-        try {
-            return ScopeRecord::on($context->connection)->create([...$attributes, ...$values]);
-        } catch (UniqueConstraintViolationException) {
-            // Two workers raced to create the same scope; the index is the
-            // authority, so re-read the winning row.
-            return ScopeRecord::on($context->connection)->where($attributes)->firstOrFail();
-        }
+        // Eloquent uses a savepoint for a raced insert inside a transaction,
+        // so PostgreSQL can safely re-read the winning row after a conflict.
+        return ScopeRecord::on($context->connection)->firstOrCreate($attributes, $values);
     }
 }

@@ -45,14 +45,6 @@ const defaultOptions = {
 
 compile({
     ...defaultOptions,
-    entryPoints: ['./resources/js/index.js'],
-    outfile: './resources/dist/filament-merge-duplicates.js',
-}).then(() => {
-    console.log(`Build completed for filament-merge-duplicates.js`)
-})
-
-compile({
-    ...defaultOptions,
     entryPoints: ['./resources/css/index.css'],
     outfile: './resources/dist/filament-merge-duplicates.css',
 }).then(() => {

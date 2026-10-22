@@ -214,7 +214,7 @@ it('marks a member that no longer matches the rule as changed', function () {
         ->and($group->hasStaleMember())->toBeTrue();
 });
 
-it('marks a member that was merged away as retired', function () {
+it('excludes merged members from suggestions even when their rows remain active', function () {
     $definition = groupDefinition();
     $context = groupContext($definition);
     $generation = publishedGeneration($context);
@@ -252,11 +252,9 @@ it('marks a member that was merged away as retired', function () {
     ]);
     $record->save();
 
-    $group = app(ReviewGroupQuery::class)->page($definition, $context)['groups'][0];
+    $page = app(ReviewGroupQuery::class)->page($definition, $context);
 
-    expect($group->members[1]->retired)->toBeTrue()
-        ->and($group->members[1]->changed)->toBeFalse()
-        ->and($group->isReviewable())->toBeFalse();
+    expect($page['groups'])->toBe([])->and($page['total'])->toBe(0);
 });
 
 it('paginates groups and caps the members shown per group', function () {

@@ -48,7 +48,7 @@ final class LockingWriterGuard implements WriterGuard
         $instance->setConnection($connection);
 
         // Same lock, same order as the executor: one of the two writers queues.
-        $this->locks->lockRecord($connection, $instance->getTable(), $parentId);
+        $this->locks->lockRecord($connection, $instance->getTable(), $parentId, $instance->getKeyName());
 
         if ($this->retirement->isRetired($connection, $modelAlias, $ownershipDomain, $parentId)) {
             throw new RecordUnavailable('This record was merged into another record and cannot receive new children.');

@@ -4,11 +4,14 @@ namespace Nagi\FilamentMergeDuplicates\Scanning;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Data\RecordId;
+use Nagi\FilamentMergeDuplicates\Exceptions\StalePreview;
 use Nagi\FilamentMergeDuplicates\Models\MembershipRecord;
 use Nagi\FilamentMergeDuplicates\Models\ScanRecord;
+use Nagi\FilamentMergeDuplicates\Models\ScopeRecord;
 use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
 
 /**
@@ -38,6 +41,32 @@ final class ScanChunkProcessor
         DuplicateContext $context,
         ScanRecord $scan,
     ): bool {
+        return DB::connection($context->connection)->transaction(function () use ($definition, $context, $scan): bool {
+            $current = ScanRecord::on($context->connection)->lockForUpdate()->findOrFail($scan->id);
+            $scan->setRawAttributes($current->getAttributes(), true);
+
+            if (! $scan->isActive()) {
+                return false;
+            }
+
+            $scopeMatches = ScopeRecord::on($context->connection)
+                ->whereKey($scan->scope_id)
+                ->where('definition_id', $definition->id())
+                ->where('scope_hash', $context->scopeHash)
+                ->exists();
+
+            if (! $scopeMatches || $scan->config_revision !== $definition->revision()
+                || $context->definitionId !== $definition->id()
+                || $context->connection !== $definition->connection()) {
+                throw new StalePreview('The scan context or definition changed. Start a new scan.');
+            }
+
+            return $this->indexChunk($definition, $context, $scan);
+        }, attempts: 3);
+    }
+
+    private function indexChunk(DuplicateDefinition $definition, DuplicateContext $context, ScanRecord $scan): bool
+    {
         $modelClass = $definition->model();
 
         /** @var Model $model */
@@ -103,6 +132,7 @@ final class ScanChunkProcessor
         $last = $records->last();
 
         $scan->state = ScanState::Running;
+        $scan->started_at ??= $now;
         $scan->cursor = (string) $last->getKey();
         $scan->heartbeat_at = $now;
         $scan->incrementCounter('chunks');

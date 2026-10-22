@@ -4,6 +4,7 @@ namespace Nagi\FilamentMergeDuplicates\Tests\Feature;
 
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
 use Nagi\FilamentMergeDuplicates\Authorization\NullContextResolver;
@@ -97,6 +98,19 @@ function mergePreviewPanel(array $definitionIds): void
 
     Filament::setCurrentPanel($panel);
 }
+
+it('rejects browser changes to merge route identities and the preview token', function (string $property) {
+    $definition = mergePreviewDefinition('locked-preview', ['merge', 'review']);
+    mergePreviewPanel([$definition->id()]);
+    [$first, $second] = mergePreviewPair();
+
+    expect(fn () => livewire(DuplicateMergePage::class, [
+        'definition' => $definition->id(),
+        'first' => (string) $first->getKey(),
+        'second' => (string) $second->getKey(),
+    ])->set($property, 'forged'))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
+})->with(['definition', 'first', 'second', 'operationId']);
 
 function mergePreviewContext(DuplicateDefinition $definition): DuplicateContext
 {

@@ -63,6 +63,18 @@ it('queues a scan and says so', function () {
     Queue::assertPushed(ProcessScanChunk::class);
 });
 
+it('requires the scan ability for an explicitly named CLI actor', function () {
+    Queue::fake();
+    registerCommandDefinition();
+
+    $this->artisan('filament-merge-duplicates:scan', [
+        ...scanCommandArguments(), '--actor' => 'ungranted-actor',
+    ])->expectsOutputToContain('may not scan')->assertFailed();
+
+    expect(ScanRecord::count())->toBe(0);
+    Queue::assertNothingPushed();
+});
+
 it('drains the scan inline when asked to', function () {
     Queue::fake();
     registerCommandDefinition();

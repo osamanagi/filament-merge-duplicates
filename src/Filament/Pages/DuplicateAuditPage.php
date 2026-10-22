@@ -4,6 +4,7 @@ namespace Nagi\FilamentMergeDuplicates\Filament\Pages;
 
 use Filament\Pages\Page;
 use Filament\Panel;
+use Livewire\Attributes\Locked;
 use Nagi\FilamentMergeDuplicates\Exceptions\DomainConflict;
 use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
 use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
@@ -29,8 +30,10 @@ final class DuplicateAuditPage extends Page
 
     protected string $view = 'filament-merge-duplicates::audit-page';
 
+    #[Locked]
     public string $definition = '';
 
+    #[Locked]
     public string $operation = '';
 
     /**

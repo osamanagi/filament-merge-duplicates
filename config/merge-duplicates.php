@@ -22,8 +22,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | Matching keys are persisted as HMAC-SHA256 digests, never as raw matched
-    | values. Rotating the secret or the key version invalidates every existing
-    | generation and dismissal, so a rescan is required.
+    | values. Keep the secret and key version stable after merging: retirement
+    | domains currently share this HMAC. Rotation needs a ledger migration as
+    | well as a rescan; see docs/implementation-review.md.
     |
     */
 
@@ -68,28 +69,6 @@ return [
 
     'scan' => [
         'chunk_size' => 1000,
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Retention
-    |--------------------------------------------------------------------------
-    |
-    | Previews are pruned by their own expiry: `filament-merge-duplicates:prune`
-    | deletes preview rows whose `expires_at` has passed, and an expired preview
-    | is refused on read whether or not it has been pruned. The merge ledger and
-    | its audit payload are never pruned, because a terminal source mapping must
-    | outlive the source row.
-    |
-    | `scans_days` is reserved: pruning finished scans, their memberships and
-    | dismissals is not implemented yet, so those rows accumulate. Nothing in the
-    | package reads it today, and settings that claim otherwise would be a lie.
-    |
-    */
-
-    'retention' => [
-        'previews_days' => 7,
-        'scans_days' => 30,
     ],
 
     /*

@@ -3,8 +3,10 @@
 namespace Nagi\FilamentMergeDuplicates\Commands;
 
 use Illuminate\Console\Command;
+use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Authorization\ServiceContextResolver;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
+use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
 use Nagi\FilamentMergeDuplicates\Exceptions\MergeDuplicatesException;
 use Nagi\FilamentMergeDuplicates\Jobs\ProcessScanChunk;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanCoordinator;
@@ -65,6 +67,11 @@ final class ScanDuplicatesCommand extends Command
 
         try {
             $context = $scopes->resolveContext($definition, $resolver);
+
+            if (! $definition->authorizer()->allows($context, Ability::Scan)) {
+                throw new ForbiddenOperation('The acting user may not scan for duplicates for this definition.');
+            }
+
             $scan = $coordinator->start($definition, $context);
         } catch (MergeDuplicatesException $exception) {
             $this->components->error($exception->getMessage());
@@ -93,7 +100,7 @@ final class ScanDuplicatesCommand extends Command
             return self::SUCCESS;
         }
 
-        ProcessScanChunk::dispatch($definition->id(), $context->toStorableArray(), $scan->id);
+        ProcessScanChunk::dispatch($definition->id(), $context->toStorableArray(), $scan->id)->afterCommit();
 
         $this->components->info("Scan {$scan->id} queued for definition [{$definition->id()}].");
 

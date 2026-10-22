@@ -4,6 +4,7 @@ namespace Nagi\FilamentMergeDuplicates\Tests\Unit\Relations;
 
 use Nagi\FilamentMergeDuplicates\Exceptions\DomainConflict;
 use Nagi\FilamentMergeDuplicates\Exceptions\MergeTooLarge;
+use Nagi\FilamentMergeDuplicates\Exceptions\UnsupportedRelation;
 use Nagi\FilamentMergeDuplicates\Relations\HasManyTransfer;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Contact;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Note;
@@ -38,6 +39,12 @@ it('refuses to transfer more children than the configured cap', function () {
     ))->toThrow(MergeTooLarge::class);
 });
 
+it('rejects relations that reference an alternate parent key', function () {
+    [$survivor, $source] = transferPair();
+    expect(fn () => (new HasManyTransfer)->transfer(new CompleteHasMany('referenceNotes'), $survivor, $source))
+        ->toThrow(UnsupportedRelation::class, 'parent primary key');
+});
+
 it('aborts when a child write does not move the foreign key', function () {
     [$survivor, $source] = transferPair();
     $note = noteFor($source, 'Call back');
@@ -68,6 +75,25 @@ it('moves every declared child and reports what it moved', function () {
     expect($result['count'])->toBe(2)
         ->and($result['moved'])->toHaveCount(2)
         ->and(Note::where('contact_id', $survivor->getKey())->count())->toBe(2);
+});
+
+it('bounds hydrated children before rejecting an oversized inventory', function () {
+    [$survivor, $source] = transferPair();
+    foreach (range(1, 8) as $number) {
+        noteFor($source, "Child {$number}");
+    }
+    $loaded = 0;
+    Note::retrieved(function () use (&$loaded): void {
+        $loaded++;
+    });
+
+    try {
+        expect(fn () => (new HasManyTransfer(2))->inventory(transferDefinition(), new CompleteHasMany('childNotes'), $source))
+            ->toThrow(MergeTooLarge::class);
+        expect($loaded)->toBe(3);
+    } finally {
+        Note::flushEventListeners();
+    }
 });
 
 /**

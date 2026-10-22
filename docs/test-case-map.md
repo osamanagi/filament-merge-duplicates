@@ -1,5 +1,21 @@
 # Test-case map
 
+## Review regressions — 22 October 2026
+
+These checks supplement the original case map. The installed Filament 5 lane and
+both real database engines passed; remaining release gaps are recorded in
+[implementation-review.md](implementation-review.md).
+
+| Case families | Regression tests | Result |
+| --- | --- | --- |
+| D07, M04, A05 | `tests/Execution/MergeSafetyTest.php`, `tests/Feature/DuplicateMergePageTest.php` | Passing: executor refuses nonmatching pairs; locked browser identities |
+| F07, M05–M09 | `tests/Execution/MergeSafetyTest.php` | Passing on MySQL/PostgreSQL: selected values/domain changes, rollback, persisted children/retained fields, completion timing, replay payload |
+| S01–S05 | `tests/Feature/ProcessScanChunkJobTest.php` | Passing: stale cursor reload, atomic progress, cancellation/publication, revision changes |
+| A01–A04 | `tests/Feature/ScanDuplicatesCommandTest.php`, `tests/Fixtures/Support/TenantScopedRecordQuery.php` | Passing: CLI ability required; scope and visibility applied independently |
+| D10, L01–L02, C02 | `tests/Execution/ScanPortabilityTest.php`, `tests/Unit/Merging/LockManagerTest.php` | Passing: SQL key joins on both engines, terminal-source exclusion, custom primary-key lock column |
+| R02–R06 | `tests/Unit/Merging/RelationPlanBuilderTest.php`, `tests/Unit/Relations/HasManyTransferTest.php`, `tests/Feature/DefinitionValidationTest.php` | Passing: bounded hydration, SQL counts, alternate-local-key refusal |
+| C01–C02 | `tests/Unit/Models/PackageModelTest.php` | Passing: explicit package-model connection precedence |
+
 Every acceptance case ID from the implementation specification, with its current
 state and the test that proves it.
 

@@ -6,6 +6,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\Locked;
 use Nagi\FilamentMergeDuplicates\Data\ValueCodec;
 use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
 use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
@@ -43,16 +44,20 @@ final class DuplicateMergePage extends Page
 
     protected string $view = 'filament-merge-duplicates::merge-page';
 
+    #[Locked]
     public string $definition = '';
 
+    #[Locked]
     public string $first = '';
 
+    #[Locked]
     public string $second = '';
 
     /**
      * The opaque identifier of the current plan. Replaced whenever the plan is
      * rebuilt, which is what makes an older operator click a no-op.
      */
+    #[Locked]
     public string $operationId = '';
 
     public string $survivorValue = '';

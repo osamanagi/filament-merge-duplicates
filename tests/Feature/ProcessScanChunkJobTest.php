@@ -8,12 +8,14 @@ use Nagi\FilamentMergeDuplicates\Data\RecordId;
 use Nagi\FilamentMergeDuplicates\Data\RecordIdType;
 use Nagi\FilamentMergeDuplicates\Definitions\DefinitionRegistry;
 use Nagi\FilamentMergeDuplicates\Exceptions\RetryExhausted;
+use Nagi\FilamentMergeDuplicates\Exceptions\StalePreview;
 use Nagi\FilamentMergeDuplicates\Jobs\ProcessScanChunk;
 use Nagi\FilamentMergeDuplicates\Models\MembershipRecord;
 use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
 use Nagi\FilamentMergeDuplicates\Models\ScanRecord;
 use Nagi\FilamentMergeDuplicates\Models\ScopeRecord;
 use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
+use Nagi\FilamentMergeDuplicates\Scanning\DismissalService;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanChunkProcessor;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanCoordinator;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanState;
@@ -226,4 +228,116 @@ it('counts a record an earlier merge retired as skipped instead of indexing it',
         ->and($scan->counter('indexed'))->toBe(1)
         ->and($scan->counter('scanned'))->toBe(2)
         ->and(MembershipRecord::on('testing')->where('record_id', (string) $retired->getKey())->count())->toBe(0);
+});
+
+it('does not publish when cancellation arrives during the last chunk', function () {
+    Queue::fake();
+    $definition = jobDefinition();
+    $context = jobContext($definition);
+    jobRecord('ACME');
+    $scan = app(ScanCoordinator::class)->start($definition, $context);
+
+    ScanRecord::updated(function (ScanRecord $updated): void {
+        app(ScanCoordinator::class)->cancel($updated);
+    });
+
+    try {
+        runChunkJob(chunkJob($definition->id(), $context, $scan->id));
+    } finally {
+        ScanRecord::flushEventListeners();
+    }
+
+    expect($scan->refresh()->state)->toBe(ScanState::Cancelled)
+        ->and(ScopeRecord::value('current_generation_id'))->toBeNull();
+    Queue::assertNothingPushed();
+});
+
+it('rejects a queued scan when its definition revision changes', function () {
+    Queue::fake();
+    $definition = jobDefinition();
+    $context = jobContext($definition);
+    jobRecord('ACME');
+    $scan = app(ScanCoordinator::class)->start($definition, $context);
+    $scan->update(['config_revision' => 'old-revision']);
+
+    expect(fn () => runChunkJob(chunkJob($definition->id(), $context, $scan->id)))
+        ->toThrow(StalePreview::class);
+    expect(MembershipRecord::count())->toBe(0)
+        ->and(ScopeRecord::value('current_generation_id'))->toBeNull();
+});
+
+it('commits memberships and the cursor together or rolls both back', function () {
+    Queue::fake();
+    $definition = jobDefinition();
+    $context = jobContext($definition);
+    jobRecord('ACME');
+    $scan = app(ScanCoordinator::class)->start($definition, $context);
+
+    ScanRecord::updating(function (): void {
+        throw new \RuntimeException('Injected cursor persistence failure');
+    });
+
+    try {
+        expect(fn () => runChunkJob(chunkJob($definition->id(), $context, $scan->id)))
+            ->toThrow(\RuntimeException::class, 'cursor persistence failure');
+    } finally {
+        ScanRecord::flushEventListeners();
+    }
+
+    expect(MembershipRecord::count())->toBe(0)
+        ->and($scan->refresh()->cursor)->toBeNull()
+        ->and($scan->counter('scanned'))->toBe(0);
+});
+
+it('reloads the cursor instead of overwriting progress from a stale worker', function () {
+    config(['merge-duplicates.scan.chunk_size' => 1]);
+    $definition = jobDefinition();
+    $context = jobContext($definition);
+    jobRecord('ONE');
+    jobRecord('TWO');
+    $scan = app(ScanCoordinator::class)->start($definition, $context);
+    $stale = $scan->fresh();
+    $processor = app(ScanChunkProcessor::class);
+
+    $processor->process($definition, $context, $scan);
+    $processor->process($definition, $context, $stale);
+
+    expect($scan->refresh()->counter('scanned'))->toBe(2)
+        ->and($scan->counter('indexed'))->toBe(2)
+        ->and(MembershipRecord::count())->toBe(2)
+        ->and($scan->started_at)->not->toBeNull();
+});
+
+it('does not revive cancelled scans through stale coordinator instances', function () {
+    $definition = jobDefinition();
+    $context = jobContext($definition);
+    $coordinator = app(ScanCoordinator::class);
+    $scan = $coordinator->start($definition, $context);
+    $stale = $scan->fresh();
+    $coordinator->cancel($scan);
+    $coordinator->publish($definition, $stale);
+    $coordinator->fail($stale, new \RuntimeException('late failure'));
+    $coordinator->run($definition, $context, $stale);
+
+    expect($scan->refresh()->state)->toBe(ScanState::Cancelled)
+        ->and(ScopeRecord::value('current_generation_id'))->toBeNull();
+});
+
+it('paginates visible buckets after suppressing dismissed pairs', function () {
+    $definition = jobDefinition();
+    $context = jobContext($definition);
+    foreach (['ONE', 'TWO', 'THREE'] as $reference) {
+        jobRecord($reference);
+        jobRecord($reference);
+    }
+    $coordinator = app(ScanCoordinator::class);
+    $coordinator->run($definition, $context, $coordinator->start($definition, $context));
+    $query = app(SuggestionQuery::class);
+    $buckets = $query->buckets($definition, $context);
+    $ids = $query->memberIds($definition, $context, $buckets[0], 2);
+    app(DismissalService::class)->dismiss($context, $definition, Contact::findOrFail($ids[0]), Contact::findOrFail($ids[1]));
+
+    expect($query->count($definition, $context))->toBe(2)
+        ->and($query->buckets($definition, $context, 1, 0)[0]->digest)->toBe($buckets[1]->digest)
+        ->and($query->buckets($definition, $context, 1, 1)[0]->digest)->toBe($buckets[2]->digest);
 });

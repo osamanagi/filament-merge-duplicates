@@ -24,6 +24,6 @@ final class TenantScopedRecordQuery implements ScopedRecordQuery
 
     public function visibleTo(Builder $query, DuplicateContext $context): Builder
     {
-        return $this->constrain($query, $context);
+        return $query;
     }
 }

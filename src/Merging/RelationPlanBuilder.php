@@ -2,6 +2,7 @@
 
 namespace Nagi\FilamentMergeDuplicates\Merging;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -73,21 +74,38 @@ final class RelationPlanBuilder
                 continue;
             }
 
-            $children = $this->childrenOf($relation, $strategy->includesSoftDeletedChildren());
+            if (! $relation instanceof HasMany || $relation->getLocalKeyName() !== $source->getKeyName()) {
+                $blockers[] = "unsupported_relation: the relation [{$name}] must be an ordinary HasMany using the parent primary key.";
+
+                continue;
+            }
+
+            $includeSoftDeleted = $strategy->includesSoftDeletedChildren();
+            $sourceCount = $this->childQuery($relation, $includeSoftDeleted)->count();
+            $survivorCount = $this->childQuery($survivor->{$name}(), $includeSoftDeleted)->count();
+
+            if ($sourceCount > $this->maxChildrenPerMerge) {
+                $blockers[] = (new MergeTooLarge($name))->errorCode()
+                    . ': the relation [' . $name . '] holds ' . $sourceCount . " children, above the configured cap of {$this->maxChildrenPerMerge}.";
+
+                continue;
+            }
+
+            $children = $this->childQuery($relation, $includeSoftDeleted)
+                ->limit($this->maxChildrenPerMerge + 1)->get();
             $ids = $children
                 ->map(static fn (Model $child): string => RecordId::fromModel($child)->encode())
                 ->values()
                 ->all();
 
             $childIds[$name] = $ids;
-            $survivorCount = $this->childrenOf($survivor->{$name}(), $strategy->includesSoftDeletedChildren())->count();
 
             if (count($ids) > $this->maxChildrenPerMerge) {
                 $blockers[] = (new MergeTooLarge($name))->errorCode()
                     . ': the relation [' . $name . '] holds ' . count($ids) . " children, above the configured cap of {$this->maxChildrenPerMerge}.";
             }
 
-            $collision = $this->uniqueCollision($relation, $children, $survivor, $name);
+            $collision = $this->uniqueCollision($relation, $children, $survivor, $name, $includeSoftDeleted);
 
             if ($collision !== null) {
                 $blockers[] = (new DomainConflict($collision))->errorCode() . ': ' . $collision;
@@ -107,19 +125,15 @@ final class RelationPlanBuilder
         return ['impacts' => $impacts, 'blockers' => $blockers, 'childIds' => $childIds];
     }
 
-    /**
-     * @return Collection<int, Model>
-     */
-    private function childrenOf(Relation $relation, bool $includeSoftDeleted): Collection
+    private function childQuery(Relation $relation, bool $includeSoftDeleted): Builder
     {
-        if ($relation instanceof HasMany && $includeSoftDeleted && $this->relatedUsesSoftDeletes($relation)) {
+        $query = clone $relation->getQuery();
 
-            return $relation->getQuery()
-                ->withoutGlobalScope(SoftDeletingScope::class)
-                ->get();
+        if ($relation instanceof HasMany && $includeSoftDeleted && $this->relatedUsesSoftDeletes($relation)) {
+            $query->withoutGlobalScope(SoftDeletingScope::class);
         }
 
-        return $relation->get();
+        return $query;
     }
 
     private function relatedUsesSoftDeletes(Relation $relation): bool
@@ -167,6 +181,7 @@ final class RelationPlanBuilder
         Collection $sourceChildren,
         Model $survivor,
         string $relationName,
+        bool $includeSoftDeleted,
     ): ?string {
         if (! $relation instanceof HasMany) {
             return null;
@@ -200,7 +215,7 @@ final class RelationPlanBuilder
                     return "the relation [{$relationName}] allows one child per record, so " . $sourceChildren->count() . ' children cannot all move.';
                 }
 
-                if ($survivor->{$relationName}()->count() > 0) {
+                if ($sourceChildren->isNotEmpty() && $this->childQuery($survivor->{$relationName}(), $includeSoftDeleted)->exists()) {
                     return "the relation [{$relationName}] already has a child on the survivor, so the source child cannot move.";
                 }
 
@@ -221,11 +236,13 @@ final class RelationPlanBuilder
             }
 
             foreach ($sourceChildren as $child) {
-                $values = $this->valuesOf($child, $others);
+                $query = $this->childQuery($survivor->{$relationName}(), $includeSoftDeleted);
 
-                $exists = $survivor->{$relationName}()->get()->contains(
-                    static fn (Model $existing): bool => self::valuesMatch($existing, $others, $values),
-                );
+                foreach ($others as $column) {
+                    $query->where($column, $child->getRawOriginal($column));
+                }
+
+                $exists = $query->exists();
 
                 if ($exists) {
                     return "a child of the relation [{$relationName}] already exists on the survivor with the same ["
@@ -242,39 +259,9 @@ final class RelationPlanBuilder
      */
     private function keyOf(Model $child, array $columns): string
     {
-        return implode("\x1f", array_map(
+        return json_encode(array_map(
             static fn (string $column): string => (string) $child->getAttribute($column),
             $columns,
-        ));
-    }
-
-    /**
-     * @param  list<string>  $columns
-     * @return array<string, string>
-     */
-    private function valuesOf(Model $child, array $columns): array
-    {
-        $values = [];
-
-        foreach ($columns as $column) {
-            $values[$column] = (string) $child->getAttribute($column);
-        }
-
-        return $values;
-    }
-
-    /**
-     * @param  list<string>  $columns
-     * @param  array<string, string>  $values
-     */
-    private static function valuesMatch(Model $existing, array $columns, array $values): bool
-    {
-        foreach ($columns as $column) {
-            if ((string) $existing->getAttribute($column) !== $values[$column]) {
-                return false;
-            }
-        }
-
-        return true;
+        ), JSON_THROW_ON_ERROR);
     }
 }

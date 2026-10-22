@@ -2,6 +2,9 @@
 
 namespace Nagi\FilamentMergeDuplicates\Tests\Unit\Merging;
 
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Nagi\FilamentMergeDuplicates\Data\RecordId;
 use Nagi\FilamentMergeDuplicates\Data\RecordIdType;
 use Nagi\FilamentMergeDuplicates\Exceptions\RecordUnavailable;
@@ -68,6 +71,17 @@ it('orders typed keys by type first and then by value', function () {
     // one total order shared by every caller.
     expect(array_map(static fn (RecordId $id): string => $id->value, $ordered))
         ->toBe(['2', '10', 'a']);
+});
+
+it('locks models whose primary key is not named id', function () {
+    Schema::create('custom_key_records', function (Blueprint $table): void {
+        $table->string('record_key')->primary();
+    });
+    DB::table('custom_key_records')->insert(['record_key' => 'custom-1']);
+
+    expect(fn () => (new LockManager)->lockRecords('testing', 'custom_key_records', [
+        RecordId::fromStored(RecordIdType::String, 'custom-1'),
+    ], 'record_key'))->not->toThrow(Throwable::class);
 });
 
 function lockScopeRow(): ScopeRecord

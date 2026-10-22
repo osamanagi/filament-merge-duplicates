@@ -62,8 +62,12 @@ final class ProcessScanChunk implements ShouldQueue
 
         $scan->refresh();
 
-        if ($moreWork && $scan->isActive()) {
-            self::dispatch($this->definitionId, $this->context, $this->scanId);
+        if (! $scan->isActive()) {
+            return;
+        }
+
+        if ($moreWork) {
+            self::dispatch($this->definitionId, $this->context, $this->scanId)->afterCommit();
 
             return;
         }

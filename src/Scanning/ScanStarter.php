@@ -50,7 +50,7 @@ final class ScanStarter
         // page-driven scan from sitting at "queued" forever because the only
         // other dispatcher is the CLI. The context travels as primitives and the
         // job re-establishes it, so nothing session-scoped is serialised.
-        ProcessScanChunk::dispatch($definition->id(), $context->toStorableArray(), $scan->id);
+        ProcessScanChunk::dispatch($definition->id(), $context->toStorableArray(), $scan->id)->afterCommit();
 
         return $scan;
     }

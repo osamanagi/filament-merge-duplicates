@@ -29,6 +29,7 @@ use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
 use Nagi\FilamentMergeDuplicates\Models\ScopeRecord;
 use Nagi\FilamentMergeDuplicates\Relations\HasManyTransfer;
 use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
+use Nagi\FilamentMergeDuplicates\Scanning\DirectPairMatcher;
 use Throwable;
 
 /**
@@ -63,6 +64,7 @@ final class MergeExecutor
         private readonly LockManager $locks,
         private readonly AuditWriter $audit,
         private readonly RetirementResolver $retirement,
+        private readonly DirectPairMatcher $matcher,
         private readonly RetryPolicy $retries = new RetryPolicy,
         private readonly array $supportedDrivers = ['mysql', 'pgsql'],
         private readonly string $keyVersion = 'v1',
@@ -124,6 +126,18 @@ final class MergeExecutor
             }
         }
 
+        if ($result->replayed) {
+            return $result;
+        }
+
+        $connection = DB::connection($definition->connection());
+
+        if ($connection->transactionLevel() > 0) {
+            $connection->afterCommit(fn () => $this->notify($context, $definition, $plan, $result));
+
+            return $result;
+        }
+
         return $this->notify($context, $definition, $plan, $result);
     }
 
@@ -155,11 +169,17 @@ final class MergeExecutor
 
             // 2. Deterministic locks: the scope coordination row first, then both
             // parents, so overlapping merges queue instead of deadlocking.
-            $this->locks->lockScope($connection, (string) $scope->id);
             $this->locks->lockRecords($connection, $parentTable, [
                 $plan->survivorId,
                 $plan->sourceId,
-            ]);
+            ], (new $parentClass)->getKeyName());
+
+            // Another request may have committed while this one waited.
+            $replay = $this->existingOperation($context, $definition, $plan->operationId, $choices);
+
+            if ($replay !== null) {
+                return $replay;
+            }
 
             // 3. Re-read both records through the scope and visibility rules and
             // reauthorize, so a revoked permission or a changed session aborts.
@@ -181,8 +201,12 @@ final class MergeExecutor
 
             $choices = $this->validatedChoices($plan, $choices);
 
+            if (! $this->matcher->matches($definition, $survivor, $source)) {
+                throw new DomainConflict('These records do not directly match a configured rule, so they cannot be merged.');
+            }
+
             // 5. Writes.
-            $writes = $this->writeFields($definition, $plan, $survivor, $source, $choices);
+            $writes = $this->writeFields($context, $definition, $plan, $survivor, $source, $choices);
             $moved = $this->moveChildren($definition, $survivor, $source, $plan);
 
             // 6. Retirement and the terminal ledger entry, in the same transaction.
@@ -201,7 +225,7 @@ final class MergeExecutor
             );
 
             // 7. Postconditions, checked before the commit makes them permanent.
-            $this->assertPostconditions($connection, $definition, $plan, $survivor, $source, $record, $writes['written'], $moved);
+            $this->assertPostconditions($connection, $definition, $plan, $survivor, $source, $record, $writes['proposed'], $moved);
 
             return new MergeResult(
                 operationId: $plan->operationId,
@@ -313,7 +337,11 @@ final class MergeExecutor
 
         $audit = $this->audit->decode((string) $record->audit_payload);
 
-        if ($choices !== [] && $this->choicesOf($audit) !== $choices) {
+        $recordedChoices = $this->choicesOf($audit);
+        ksort($recordedChoices);
+        ksort($choices);
+
+        if ($recordedChoices !== $choices) {
             throw new DomainConflict('This merge operation already committed with different choices.');
         }
 
@@ -333,6 +361,7 @@ final class MergeExecutor
         $scope = ScopeRecord::on($connection)
             ->where('definition_id', $definition->id())
             ->where('scope_hash', $plan->scopeHash)
+            ->lockForUpdate()
             ->first();
 
         if (! $scope instanceof ScopeRecord) {
@@ -460,9 +489,10 @@ final class MergeExecutor
      * merge actually changed.
      *
      * @param  array<string, string>  $choices
-     * @return array{written: array<string, mixed>, previous: array<string, array<string, mixed>>}
+     * @return array{written: array<string, mixed>, proposed: array<string, mixed>, previous: array<string, array<string, mixed>>}
      */
     private function writeFields(
+        DuplicateContext $context,
         DuplicateDefinition $definition,
         MergePlan $plan,
         Model $survivor,
@@ -470,6 +500,7 @@ final class MergeExecutor
         array $choices,
     ): array {
         $written = [];
+        $proposed = [];
         $previous = ['survivor' => [], 'source' => []];
 
         foreach ($plan->differences as $difference) {
@@ -493,23 +524,34 @@ final class MergeExecutor
                 ? $source->getAttribute($field)
                 : $survivor->getAttribute($field);
 
+            $proposed[$field] = $value;
+
             if (ValueCodec::equal($survivor->getAttribute($field), $value, $field, $definition->id())) {
                 continue;
             }
 
-            $survivor->setAttribute($field, $value);
             $written[$field] = $value;
         }
 
+        $errors = $definition->validator()?->validate($context, $proposed) ?? [];
+
+        if ($errors !== []) {
+            throw new DomainConflict(implode(' ', $errors));
+        }
+
+        foreach ($written as $field => $value) {
+            $survivor->setAttribute($field, $value);
+        }
+
         if ($written === []) {
-            return ['written' => [], 'previous' => $previous];
+            return ['written' => [], 'proposed' => $proposed, 'previous' => $previous];
         }
 
         if ($survivor->save() === false) {
             throw new DomainConflict('A model event cancelled the survivor update, so the merge was aborted.');
         }
 
-        return ['written' => $written, 'previous' => $previous];
+        return ['written' => $written, 'proposed' => $proposed, 'previous' => $previous];
     }
 
     /**
@@ -711,6 +753,9 @@ final class MergeExecutor
         array $written,
         array $moved,
     ): void {
+        $survivor->refresh();
+        $source->refresh();
+
         if ($this->isTrashed($survivor)) {
             throw new DomainConflict('The survivor was retired by this merge, so it was rolled back.');
         }
@@ -728,8 +773,6 @@ final class MergeExecutor
         if ($ledgerRows !== 1) {
             throw new DomainConflict('The merge ledger is not unique for this operation, so the merge was rolled back.');
         }
-
-        $survivor->refresh();
 
         foreach ($written as $field => $value) {
             if (! ValueCodec::equal($survivor->getAttribute($field), $value, $field, $definition->id())) {
@@ -755,6 +798,21 @@ final class MergeExecutor
                 ));
             }
 
+            $relation = $survivor->{$strategy->name()}();
+            $related = $relation->getRelated();
+            $ids = array_map(static fn (string $id): string => RecordId::decode($id)->value, $moved['ids'][$strategy->name()] ?? []);
+            $persistedCount = $related->newQueryWithoutScopes()
+                ->whereIn($related->getKeyName(), $ids)
+                ->where($relation->getForeignKeyName(), $survivor->getKey())
+                ->count();
+
+            if ($persistedCount !== $expected) {
+                throw new DomainConflict(sprintf(
+                    'The transferred children of [%s] did not stay with the survivor, so the merge was rolled back.',
+                    $strategy->name(),
+                ));
+            }
+
             if ($expected !== count($moved['ids'][$strategy->name()] ?? [])) {
                 throw new DomainConflict(sprintf(
                     'The transferred children of [%s] do not match the plan, so the merge was rolled back.',
@@ -774,23 +832,23 @@ final class MergeExecutor
         MergePlan $plan,
         MergeResult $result,
     ): MergeResult {
-        $survivor = $this->fetchVisible($context, $definition, $plan->survivorId);
-        $source = $this->fetchVisibleUnscoped($definition, $plan->sourceId);
-
-        $merge = new MergeContext(
-            operationId: $result->operationId,
-            definitionId: $definition->id(),
-            definitionRevision: $definition->revision(),
-            connection: $definition->connection(),
-            context: $context,
-            survivorId: $result->survivorId,
-            sourceId: $result->sourceId,
-            survivor: $survivor,
-            source: $source,
-            movedChildIds: $result->movedChildIds,
-        );
-
         try {
+            $survivor = $this->fetchVisible($context, $definition, $plan->survivorId);
+            $source = $this->fetchVisibleUnscoped($definition, $plan->sourceId);
+
+            $merge = new MergeContext(
+                operationId: $result->operationId,
+                definitionId: $definition->id(),
+                definitionRevision: $definition->revision(),
+                connection: $definition->connection(),
+                context: $context,
+                survivorId: $result->survivorId,
+                sourceId: $result->sourceId,
+                survivor: $survivor,
+                source: $source,
+                movedChildIds: $result->movedChildIds,
+            );
+
             MergeCompleted::dispatch($merge, $result);
         } catch (Throwable $exception) {
             Log::warning('filament-merge-duplicates: an after-commit merge listener failed.', [

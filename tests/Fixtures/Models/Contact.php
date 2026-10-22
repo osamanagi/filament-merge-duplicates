@@ -29,6 +29,11 @@ class Contact extends Model
         return $this->hasMany(Note::class, 'contact_id');
     }
 
+    public function referenceNotes(): HasMany
+    {
+        return $this->hasMany(Note::class, 'contact_id', 'reference');
+    }
+
     /**
      * A relation whose model lives on another connection: declared so the
      * definition validator can refuse it.

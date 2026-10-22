@@ -6,7 +6,7 @@ Pest is the single test runner. Tests are organised by what they prove:
 | --- | --- | --- |
 | `tests/Unit` | Normalizers, tuple encoding, rule evaluation, field choice policy, configuration validation, ID codecs, fingerprinting | Only genuine external boundaries |
 | `tests/Feature` | Migrations, scans, generations, dismissals, planner, executor, ledger, authorization, constraints, rollback against real SQL databases | No database or queue fakes for persistence, retry or transaction paths |
-| `tests/Filament` | Authenticated banner, review page, choices, forged requests, merge, errors, audit on both majors | Outbound notifications may be faked; database state and visible UI must be asserted |
+| Filament cases in `tests/Feature` and `tests/Execution` | Authenticated banner, review page, choices, forged requests, merge, errors, audit on both majors | Outbound notifications may be faked; database state and visible UI must be asserted |
 | `tests/Concurrency` | Separate MySQL/PostgreSQL connections racing scans, merges and child writes | No mocked locks, no SQLite |
 | Demo application (`/Users/nagi/code/demo`) | Fresh host install, two unrelated definitions, queued scan, review, merge, audit, 4 → 5 upgrade | Real services |
 
@@ -47,11 +47,12 @@ Those are defensive guards and postconditions that a documented contract makes
 unreachable, not untested behaviour: covering them would require a stub that
 breaks the contract the guard exists to protect.
 
-The threshold in CI and in `composer test:coverage` is therefore the measured
-floor (**98**), enforced so it can only move up. It is deliberately not a claim
-that the residual lines are covered, and it is not a threshold that was lowered
-to make a lane pass: the lane passes at 98.2, and the exceptions above are the
-review the M7 gate asks for.
+The threshold in CI and in `composer test:coverage` is the measured floor (**98**).
+This differs from the implementation plan's explicit requirement for 100% of
+executable `src/` lines independently on both majors. The 98% gate does not satisfy
+that requirement, even when individual uncovered lines have been reviewed.
+See [the implementation review](implementation-review.md) for the current result
+and remaining release gaps.
 
 Measured totals: M2 69.6%, M3 76.1%, M4 80.7%, M5 83.3%, M7 **98.2%** (`src/`
 lines, pcov, full suite).
@@ -98,6 +99,19 @@ Recorded runs (Apple arm64, in-memory SQLite, PHP 8.4.22, single process):
 | SQL queries | 1,413 (~14 per chunk, not per record) | 1,413 |
 | Membership rows | 300,000 = records x rules (linear, never pairs) | 300,000 |
 | Suggestions | 200 | 200 |
+
+Review run, 22 October 2026: local macOS, PHP 8.4.8, in-memory SQLite; the
+Filament 5 full suite was running separately at the same time. The existing
+100,000-record benchmark passed: 100 chunks, 300,000 memberships, 200 suggestions,
+11.20 seconds measured scan time (17.96 seconds for the test invocation),
+52.5 MiB peak memory, 10 MiB growth, and 1,615 counted SQL queries. The additional
+queries include transactional scan-state/context checks. Timing is a local
+measurement, not a cross-machine comparison or production guarantee.
+
+The final review suite on Filament 5.9.0 passed 674 tests with 1,907 assertions;
+the benchmark was skipped in that invocation and passed separately. Measured
+`src/` coverage was 98.0%. PHPStan level 5, changed-file Pint checks, Composer
+validation, and the CSS build passed. Filament 4 was not rerun in this review.
 
 The M7 run is slower than the M4 run on the same machine and the same fixtures.
 The query count, the membership count and the memory profile are unchanged, so

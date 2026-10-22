@@ -157,6 +157,10 @@ final class MergePlanner
     ): string {
         $relations = $this->relations->build($definition, $survivor, $source);
 
+        if ($relations['blockers'] !== []) {
+            throw new DomainConflict(implode(' ', $relations['blockers']));
+        }
+
         return $this->fingerprints->pair($definition, $survivor, $source, $relations['childIds']);
     }
 

@@ -70,6 +70,14 @@ function mergeReadyConfig(array $overrides = []): array
     ];
 }
 
+it('blocks has-many relations that use an alternate parent key', function () {
+    $report = validateDefinition(mergeReadyConfig([
+        'relations' => [new CompleteHasMany('referenceNotes')],
+    ]));
+
+    expect(blockerMessages($report))->toContain('parent primary key');
+});
+
 /*
 |--------------------------------------------------------------------------
 | Unreadable and malformed definitions

@@ -40,9 +40,9 @@ final class LockManager
     /**
      * Locks one parent row.
      */
-    public function lockRecord(string $connection, string $table, RecordId $id): void
+    public function lockRecord(string $connection, string $table, RecordId $id, string $keyName = 'id'): void
     {
-        $row = $this->query($connection, $table)->where('id', $id->value)->lockForUpdate()->first();
+        $row = $this->query($connection, $table)->where($keyName, $id->value)->lockForUpdate()->first();
 
         if ($row === null) {
             throw new RecordUnavailable('A record needed for this merge no longer exists.');
@@ -55,10 +55,10 @@ final class LockManager
      *
      * @param  list<RecordId>  $ids
      */
-    public function lockRecords(string $connection, string $table, array $ids): void
+    public function lockRecords(string $connection, string $table, array $ids, string $keyName = 'id'): void
     {
         foreach ($this->inCanonicalOrder($ids) as $id) {
-            $this->lockRecord($connection, $table, $id);
+            $this->lockRecord($connection, $table, $id, $keyName);
         }
     }
 
@@ -69,10 +69,10 @@ final class LockManager
      *
      * @param  list<RecordId>  $ids
      */
-    public function lockChildren(string $connection, string $table, array $ids): void
+    public function lockChildren(string $connection, string $table, array $ids, string $keyName = 'id'): void
     {
         foreach ($this->inCanonicalOrder($ids) as $id) {
-            $this->lockRecord($connection, $table, $id);
+            $this->lockRecord($connection, $table, $id, $keyName);
         }
     }
 

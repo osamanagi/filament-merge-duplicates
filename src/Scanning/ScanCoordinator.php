@@ -75,11 +75,6 @@ final class ScanCoordinator
      */
     public function run(DuplicateDefinition $definition, DuplicateContext $context, ScanRecord $scan): ScanRecord
     {
-        $scan->state = ScanState::Running;
-        $scan->started_at ??= now();
-        $scan->heartbeat_at = now();
-        $scan->save();
-
         try {
             while ($this->processor->process($definition, $context, $scan)) {
                 // The processor persists the cursor and heartbeat each chunk, so
@@ -103,7 +98,18 @@ final class ScanCoordinator
     {
         $connection = $scan->getConnectionName();
 
-        DB::connection($connection)->transaction(function () use ($definition, $scan, $connection): void {
+        $published = DB::connection($connection)->transaction(function () use ($definition, $scan, $connection): bool {
+            $current = ScanRecord::on($connection)->lockForUpdate()->findOrFail($scan->id);
+            $scan->setRawAttributes($current->getAttributes(), true);
+
+            if (! $scan->isActive()) {
+                return false;
+            }
+
+            if ($scan->config_revision !== $definition->revision()) {
+                throw new DomainConflict('The definition changed during this scan. Start a new scan.');
+            }
+
             $scan->state = ScanState::Succeeded;
             $scan->finished_at = now();
             $scan->failure_code = null;
@@ -115,18 +121,20 @@ final class ScanCoordinator
                     'current_generation_id' => $scan->generation_id,
                     'definition_revision' => $definition->revision(),
                 ]);
+
+            return true;
         });
 
-        ScanCompleted::dispatch($scan);
+        if ($published) {
+            ScanCompleted::dispatch($scan);
+        }
     }
 
     public function cancel(ScanRecord $scan): ScanRecord
     {
-        if ($scan->isActive()) {
-            $scan->state = ScanState::Cancelled;
-            $scan->finished_at = now();
-            $scan->save();
-        }
+        ScanRecord::on($scan->getConnectionName())->whereKey($scan->id)
+            ->whereIn('state', [ScanState::Queued->value, ScanState::Running->value])
+            ->update(['state' => ScanState::Cancelled->value, 'finished_at' => now()]);
 
         return $scan->refresh();
     }
@@ -137,12 +145,19 @@ final class ScanCoordinator
      */
     public function fail(ScanRecord $scan, Throwable $exception): ScanRecord
     {
-        $scan->state = ScanState::Failed;
-        $scan->finished_at = now();
-        $scan->failure_code = $this->sanitize($exception);
-        $scan->save();
+        $updated = ScanRecord::on($scan->getConnectionName())->whereKey($scan->id)
+            ->whereIn('state', [ScanState::Queued->value, ScanState::Running->value])
+            ->update([
+                'state' => ScanState::Failed->value,
+                'finished_at' => now(),
+                'failure_code' => $this->sanitize($exception),
+            ]);
 
-        ScanFailed::dispatch($scan, $scan->failure_code);
+        $scan->refresh();
+
+        if ($updated > 0) {
+            ScanFailed::dispatch($scan, $scan->failure_code);
+        }
 
         return $scan->refresh();
     }

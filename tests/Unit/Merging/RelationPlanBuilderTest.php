@@ -122,6 +122,28 @@ it('counts a trashed child when the definition declares soft-deleted children', 
         ->and($withSoftDeleted['impacts'][0]->movingCount)->toBe(1);
 });
 
+it('counts large survivor inventories without hydrating them', function () {
+    $source = contactRow('Source');
+    $survivor = contactRow('Survivor');
+    noteRow($source, 'Moving');
+    foreach (range(1, 8) as $number) {
+        noteRow($survivor, "Existing {$number}");
+    }
+    $loaded = 0;
+    Note::retrieved(function () use (&$loaded): void {
+        $loaded++;
+    });
+
+    try {
+        $result = (new RelationPlanBuilder(2))->build(relationDefinition([new CompleteHasMany('childNotes')]), $survivor, $source);
+        expect($result['blockers'])->toBe([])
+            ->and($result['impacts'][0]->resultingCount)->toBe(9)
+            ->and($loaded)->toBe(1);
+    } finally {
+        Note::flushEventListeners();
+    }
+});
+
 /**
  * @param  list<RelationStrategy>  $relations
  * @return array{impacts: list<object>, blockers: list<string>, childIds: array<string, list<string>>}

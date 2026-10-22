@@ -3,21 +3,26 @@
 namespace Nagi\FilamentMergeDuplicates\Scanning;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Models\ScopeRecord;
+use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
 
 /**
  * Reads suggestions from the active generation.
  *
  * Counts and buckets are computed in SQL against the actor's visibility
- * constraint, so a count can never reveal that hidden records exist. Members are
- * never hydrated to compute a count, and pairs are never materialised.
+ * and tenant constraints. Two-member buckets are checked for dismissal using
+ * live records; larger buckets are approximate. Pair rows are never persisted.
  */
 final class SuggestionQuery
 {
-    public function __construct(private readonly DismissalService $dismissals) {}
+    public function __construct(
+        private readonly DismissalService $dismissals,
+        private readonly RetirementResolver $retirement,
+    ) {}
 
     public function generationId(DuplicateDefinition $definition, DuplicateContext $context): ?string
     {
@@ -35,7 +40,7 @@ final class SuggestionQuery
      */
     public function count(DuplicateDefinition $definition, DuplicateContext $context): int
     {
-        return count($this->buckets($definition, $context));
+        return iterator_count($this->visibleBuckets($definition, $context));
     }
 
     public function hasGeneration(DuplicateDefinition $definition, DuplicateContext $context): bool
@@ -52,10 +57,31 @@ final class SuggestionQuery
         ?int $limit = null,
         int $offset = 0,
     ): array {
+        $buckets = [];
+        $skipped = 0;
+
+        foreach ($this->visibleBuckets($definition, $context) as $bucket) {
+            if ($skipped++ < $offset) {
+                continue;
+            }
+
+            if ($limit !== null && count($buckets) >= $limit) {
+                break;
+            }
+
+            $buckets[] = $bucket;
+        }
+
+        return $buckets;
+    }
+
+    /** @return \Generator<int, CandidateBucket> */
+    private function visibleBuckets(DuplicateDefinition $definition, DuplicateContext $context): \Generator
+    {
         $generation = $this->generationId($definition, $context);
 
         if ($generation === null) {
-            return [];
+            return;
         }
 
         $labels = [];
@@ -65,10 +91,7 @@ final class SuggestionQuery
         }
 
         $rows = $this->bucketQuery($definition, $context, $generation)
-            ->when($limit !== null, static fn ($query) => $query->limit($limit)->offset($offset))
-            ->get();
-
-        $buckets = [];
+            ->cursor();
 
         foreach ($rows as $row) {
             $bucket = new CandidateBucket(
@@ -82,14 +105,12 @@ final class SuggestionQuery
             // suggestion. Larger buckets are kept, because they may still hold
             // an undisposed pair; that approximation is deliberate, bounded and
             // documented rather than solved by materialising every pair.
-            if ($bucket->visibleCount === 2 && $this->isFullyDismissed($definition, $context, $generation, $bucket)) {
+            if ($bucket->visibleCount === 2 && $this->isFullyDismissed($definition, $context, $bucket)) {
                 continue;
             }
 
-            $buckets[] = $bucket;
+            yield $bucket;
         }
-
-        return $buckets;
     }
 
     /**
@@ -111,21 +132,7 @@ final class SuggestionQuery
             return [];
         }
 
-        $model = $definition->model();
-
-        /** @var Model $instance */
-        $instance = new $model;
-        $keyName = $instance->getKeyName();
-
-        $visible = $definition->scopedRecordQuery()
-            ->visibleTo($model::query(), $context)
-            ->toBase()
-            ->select("{$instance->getTable()}.{$keyName} as visible_id");
-
-        return DB::connection($context->connection)
-            ->table('filament_merge_duplicates_memberships as m')
-            ->joinSub($visible, 'v', 'v.visible_id', '=', 'm.record_id')
-            ->where('m.generation_id', $generation)
+        return $this->membershipQuery($definition, $context, $generation)
             ->where('m.rule_id', $bucket->ruleId)
             ->where('m.digest', $bucket->digest)
             ->orderBy('m.record_id')
@@ -135,7 +142,7 @@ final class SuggestionQuery
             ->all();
     }
 
-    private function bucketQuery(DuplicateDefinition $definition, DuplicateContext $context, string $generation)
+    private function membershipQuery(DuplicateDefinition $definition, DuplicateContext $context, string $generation): Builder
     {
         $model = $definition->model();
 
@@ -143,15 +150,32 @@ final class SuggestionQuery
         $instance = new $model;
         $keyName = $instance->getKeyName();
 
-        $visible = $definition->scopedRecordQuery()
-            ->visibleTo($model::query(), $context)
-            ->toBase()
-            ->select("{$instance->getTable()}.{$keyName} as visible_id");
+        $scoped = $definition->scopedRecordQuery();
+        $visible = $scoped->constrain($model::query(), $context);
+        $visible = $scoped->visibleTo($visible, $context)->toBase();
+        $key = $visible->getGrammar()->wrap("{$instance->getTable()}.{$keyName}");
+        // PostgreSQL requires identical join types. Keep SQLite/MySQL keys
+        // uncast so their primary-key lookups remain available to the planner.
+        $selection = DB::connection($context->connection)->getDriverName() === 'pgsql'
+            ? "CAST({$key} AS TEXT)" : $key;
+        $visible->selectRaw("{$selection} as visible_id");
+        $domain = $this->retirement->domainDigest($context->connection, $model, $definition->ownershipDomain());
 
         return DB::connection($context->connection)
             ->table('filament_merge_duplicates_memberships as m')
             ->joinSub($visible, 'v', 'v.visible_id', '=', 'm.record_id')
             ->where('m.generation_id', $generation)
+            ->whereNotExists(static function (Builder $query) use ($domain): void {
+                $query->selectRaw('1')->from('filament_merge_duplicates_merges as retired')
+                    ->where('retired.retirement_domain', $domain)
+                    ->whereColumn('retired.source_id', 'm.record_id')
+                    ->whereColumn('retired.source_id_type', 'm.record_id_type');
+            });
+    }
+
+    private function bucketQuery(DuplicateDefinition $definition, DuplicateContext $context, string $generation): Builder
+    {
+        return $this->membershipQuery($definition, $context, $generation)
             ->groupBy('m.rule_id', 'm.digest')
             ->havingRaw('COUNT(*) >= 2')
             ->orderBy('m.rule_id')
@@ -162,7 +186,6 @@ final class SuggestionQuery
     private function isFullyDismissed(
         DuplicateDefinition $definition,
         DuplicateContext $context,
-        string $generation,
         CandidateBucket $bucket,
     ): bool {
         $memberIds = $this->memberIds($definition, $context, $bucket, 3);
@@ -173,8 +196,9 @@ final class SuggestionQuery
 
         $model = $definition->model();
 
-        /** @var list<Model> $records */
-        $records = $model::query()
+        $scoped = $definition->scopedRecordQuery();
+        $query = $scoped->constrain($model::query(), $context);
+        $records = $scoped->visibleTo($query, $context)
             ->whereIn((new $model)->getKeyName(), $memberIds)
             ->get()
             ->all();

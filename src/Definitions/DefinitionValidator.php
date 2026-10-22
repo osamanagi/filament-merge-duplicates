@@ -4,6 +4,7 @@ namespace Nagi\FilamentMergeDuplicates\Definitions;
 
 use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
@@ -439,6 +440,17 @@ final class DefinitionValidator
 
                 if (! $resolved instanceof Relation) {
                     $issues[] = ConfigurationIssue::blocker('invalid_configuration', "The declared relation [{$name}] is not an Eloquent relation.", "relations.{$name}");
+
+                    continue;
+                }
+
+                if (! $resolved instanceof HasMany
+                    || $resolved->getLocalKeyName() !== $model->getKeyName()) {
+                    $issues[] = ConfigurationIssue::blocker(
+                        'unsupported_relation',
+                        "The relation [{$name}] must be an ordinary HasMany using the parent primary key as its local key.",
+                        "relations.{$name}",
+                    );
 
                     continue;
                 }

@@ -6,6 +6,7 @@ use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Panel;
+use Livewire\Attributes\Locked;
 use Nagi\FilamentMergeDuplicates\Exceptions\DomainConflict;
 use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
 use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
@@ -45,6 +46,7 @@ final class DuplicateReviewPage extends Page
     /**
      * The definition being reviewed, bound from the route.
      */
+    #[Locked]
     public string $definition = '';
 
     /**

@@ -109,7 +109,7 @@ but neither has to be published: the package ships working defaults.
 | `definitions` | `[]` | Definition classes the registry resolves. A queued worker resolves them from here, so this is the whole list, not a per-panel list. |
 | `connection` | `null` | Connection the package tables live on. `null` means the merged model's own connection, which must be the same one. |
 | `secret` | `null` | HMAC secret for matching keys. `null` falls back to `app.key`. |
-| `key_version` | `'v1'` | Part of the key digest. Bump it to invalidate every published generation and dismissal on purpose. |
+| `key_version` | `'v1'` | Part of the key digest. Keep stable after merging; see the rotation limitation below. |
 | `preview.ttl_minutes` | `15` | How long a merge preview stays confirmable. An expired preview has to be rebuilt. |
 | `scan.chunk_size` | `1000` | Records per chunk job. Keyset paging, never offsets. |
 | `relations.max_children_per_merge` | `500` | Above this a merge is blocked with an explanation instead of truncated. |
@@ -118,12 +118,16 @@ but neither has to be published: the package ships working defaults.
 
 Two things to know before you configure anything:
 
-- Matching keys are stored as HMAC digests, never as raw values. Rotating the
-  secret or `app.key` invalidates published generations and dismissals, so a
-  rotation needs a rescan. Matching keys are also not portable between
-  applications.
-- `retention.scans_days` exists but is not consumed: pruning finished scans, their
-  memberships and dismissals is not implemented, so those rows accumulate. Expired
+- Matching keys are stored as HMAC digests, never as raw values. **Keep the
+  matching secret and `key_version` stable after the first merge.** Terminal
+  retirement domains currently use the same versioned HMAC: changing either
+  prevents old ledger mappings from being found, so a rescan alone is insufficient.
+  This also applies to `app.key` when no separate matching secret is configured.
+  Rotation needs a ledger migration before it is safe; see
+  [the review](docs/implementation-review.md). Matching keys are not portable
+  between applications.
+- Pruning finished scans, their memberships and dismissals is not implemented,
+  so those rows accumulate. The unused retention settings have been removed. Expired
   previews are pruned by `filament-merge-duplicates:prune`, and the merge ledger is
   never pruned. See [docs/support-matrix.md](docs/support-matrix.md) for the exact
   boundary.

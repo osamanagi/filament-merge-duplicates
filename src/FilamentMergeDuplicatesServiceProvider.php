@@ -6,7 +6,6 @@ use Filament\Support\Assets\Asset;
 use Filament\Support\Assets\Css;
 use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentIcon;
-use Livewire\Features\SupportTesting\Testable;
 use Nagi\FilamentMergeDuplicates\Commands\PruneDuplicatesCommand;
 use Nagi\FilamentMergeDuplicates\Commands\ScanDuplicatesCommand;
 use Nagi\FilamentMergeDuplicates\Data\KeyHasher;
@@ -40,7 +39,6 @@ use Nagi\FilamentMergeDuplicates\Scanning\ScanCoordinator;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanStarter;
 use Nagi\FilamentMergeDuplicates\Scanning\ScopeManager;
 use Nagi\FilamentMergeDuplicates\Scanning\SuggestionQuery;
-use Nagi\FilamentMergeDuplicates\Testing\TestsFilamentMergeDuplicates;
 use Spatie\LaravelPackageTools\Commands\InstallCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -160,6 +158,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
             $app->make(LockManager::class),
             $app->make(AuditWriter::class),
             $app->make(RetirementResolver::class),
+            $app->make(DirectPairMatcher::class),
             $app->make(RetryPolicy::class),
             array_values(array_filter((array) config('merge-duplicates.supported_merge_drivers', ['mysql', 'pgsql']), 'is_string')),
             (string) config('merge-duplicates.key_version', 'v1'),
@@ -183,9 +182,6 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
 
         // Icon Registration
         FilamentIcon::register($this->getIcons());
-
-        // Testing
-        Testable::mixin(new TestsFilamentMergeDuplicates);
 
         // Definitions are registered by class name from configuration, so a
         // queued worker can resolve one without loading panel middleware and no

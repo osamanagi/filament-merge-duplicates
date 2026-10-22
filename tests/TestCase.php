@@ -13,7 +13,6 @@ use Filament\Schemas\SchemasServiceProvider;
 use Filament\Support\SupportServiceProvider;
 use Filament\Tables\TablesServiceProvider;
 use Filament\Widgets\WidgetsServiceProvider;
-use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\DB;
 use Livewire\LivewireServiceProvider;
 use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesServiceProvider;
@@ -30,10 +29,6 @@ class TestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
-
-        Factory::guessFactoryNamesUsing(
-            fn (string $modelName) => 'Nagi\\FilamentMergeDuplicates\\Database\\Factories\\' . class_basename($modelName) . 'Factory'
-        );
 
         // Every test gets its own freshly migrated in-memory database. The
         // schema is therefore deterministic, schema introspection inside the

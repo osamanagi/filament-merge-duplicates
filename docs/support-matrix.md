@@ -110,7 +110,7 @@ different event semantics.
 | Row | Pruned by | Notes |
 | --- | --- | --- |
 | Merge previews | `filament-merge-duplicates:prune` | Also refused as stale on read once expired, so pruning is housekeeping, not correctness. |
-| Scans, memberships, dismissals | Nothing yet | `retention.scans_days` is reserved and unconsumed; these rows accumulate until a prune path is written. |
+| Scans, memberships, dismissals | Nothing yet | These rows accumulate until a prune path is written. |
 | Merge ledger and its audit payload | Never | A terminal source mapping has to outlive the record it refers to. |
 
 ## Explicit non-claims
@@ -120,8 +120,10 @@ different event semantics.
 - No "zero data loss" claim. The guarantee is conditional on the host upholding
   the WriterGuard protocol and on the declared reference inventory being complete.
 - Soft-delete restore is **not** an unmerge.
-- Scans, memberships and dismissals are **not pruned**: only expired previews are, and
-  `retention.scans_days` currently does nothing.
+- Scans, memberships and dismissals are **not pruned**: only expired previews are.
+- Secret or `key_version` rotation after merging requires a terminal-ledger
+  migration. A rescan alone does not preserve retirement lookup; see
+  [implementation review](implementation-review.md).
 - Merge execution is **not** queued: it runs inside the request that confirms it. Scans
   are queued and chunked.
 - There is **no bulk or automatic merge**, and no unmerge.

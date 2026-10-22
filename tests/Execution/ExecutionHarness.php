@@ -188,6 +188,7 @@ trait ExecutionHarness
             ], 'actor-1'),
             'matchingRules' => [
                 ExactRule::make('reference')->fields(['reference']),
+                ExactRule::make('display-name')->fields(['display_name']),
             ],
             'fields' => [
                 MergeField::make('reference'),
