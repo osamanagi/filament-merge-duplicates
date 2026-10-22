@@ -140,6 +140,13 @@ it('installs, enforces the terminal constraint, and rolls back', function (strin
     expect(fn () => insertLedgerRow($connection, ledgerRow('99', '43'), ledgerId('B001')))
         ->toThrow(UniqueConstraintViolationException::class);
 
+    // Downgrading to the HMAC implementation would lose the meaning of stable
+    // domains. The migration refuses that downgrade without touching the ledger.
+    expect(fn () => $this->artisan('migrate:rollback', $migrate))
+        ->toThrow(RuntimeException::class, 'cannot be rolled back');
+    expect(DB::connection($connection)->table('filament_merge_duplicates_merges')->count())->toBe(1);
+    DB::connection($connection)->table('filament_merge_duplicates_merges')->delete();
+
     $this->artisan('migrate:rollback', $migrate)->assertSuccessful();
 
     foreach (PACKAGE_TABLES as $table) {

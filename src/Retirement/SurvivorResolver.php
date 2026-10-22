@@ -81,6 +81,8 @@ final class SurvivorResolver
      */
     private function nextHop(DuplicateDefinition $definition, RecordId $recordId): ?RecordId
     {
+        $this->retirement->assertMigrated($definition->connection());
+
         $record = MergeRecord::on($definition->connection())
             ->where('retirement_domain', $this->retirement->domainDigest(
                 $definition->connection(),

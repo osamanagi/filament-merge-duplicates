@@ -12,9 +12,9 @@ and automated verification, not certification of arbitrary host applications.
 
 ## Outstanding findings
 
-### P1 — Key rotation changes permanent retirement identities
+### P1 — Key rotation changes permanent retirement identities (resolved)
 
-`RetirementResolver::domainDigest()` uses `KeyHasher`, whose input includes the
+The original `RetirementResolver::domainDigest()` used `KeyHasher`, whose input included the
 matching secret and `key_version`. A merge records its source under that digest.
 After either changes, `isRetired()` and survivor resolution search a different
 domain. A restored source can then escape terminal retirement checks. This also
@@ -25,12 +25,14 @@ Reproduction: merge a matching pair, restore its source, change `key_version`,
 restart the process to rebuild the singleton hasher, and ask whether the source
 is retired. The old mapping is no longer found. Rescanning does not repair it.
 
-Keep these values stable after merging. README and configuration guidance now say
-so. Before promising rotation support, give terminal identity a stable encoding
-independent of matching-key rotation and migrate existing ledger domains while
-the original configuration is available. The migration must preserve uniqueness
-across definitions sharing a model/ownership domain. Silently changing the digest
-algorithm would itself strand existing mappings, so this review does not do that.
+The follow-up implementation replaces this with a stable version-2 SHA-256
+identity and an additive migration that converts existing domains using the
+original registered definitions and matching configuration. Legacy markers block
+retirement-dependent operations if conversion fails; unknown domains are not
+guessed. Audit/replay scope checks preserve tenant boundaries after scope-hash
+rotation. See [ADR 0010](adr/0010-stable-retirement-domains.md) and
+[the upgrade procedure](retirement-identity-upgrade.md). Existing installations
+must run that migration before rotating keys.
 
 ### P2 — The release evidence does not satisfy the original plan
 
@@ -41,10 +43,11 @@ The measured 98.0% in this review is not 100%, and passing this gate is not evid
 that M7 is complete. Settle the requirement explicitly rather than describing it
 as achieved. Important bugs found here were compatible with high line coverage.
 
-Only the installed Filament 5.9.0 / PHP 8.4.8 lane was rerun here. Both database
-engines were exercised. Historical Filament 4 results and CI descriptions were
-read, but the Filament 4 matrix, dependency lower bounds, and browser journeys
-were not independently rerun during this review.
+The initial review reran the installed Filament 5.9.0 / PHP 8.4.8 lane. Both
+database engines were exercised. The permanent-identity follow-up also reran the
+current Filament 4 lane in an isolated installation. Dependency lower bounds and
+manual browser journeys have not been independently rerun; current results are
+recorded in [testing.md](testing.md).
 
 ### P2 — Scope and policy guarantees depend on host integration
 
@@ -152,6 +155,7 @@ tests expecting restored terminal sources to remain in suggestions were updated
 to assert their exclusion. Execution fixtures now declare a second matching rule
 so field-conflict tests still exercise legitimately matching pairs.
 
-The changes improve correctness without replacing the architecture. Resolve the
-terminal-identity rotation problem and reconcile the remaining release criteria
-before calling the plugin production-ready against the original plan.
+The changes improve correctness without replacing the architecture. The
+terminal-identity follow-up resolves the rotation bug; reconcile the remaining
+release criteria before calling the plugin production-ready against the original
+plan.

@@ -1,5 +1,17 @@
 # Test-case map
 
+## Permanent identity follow-up — 22 October 2026
+
+| Case families | Tests | Behavior |
+| --- | --- | --- |
+| D09, L01–L02, C05–C06 | `tests/Execution/RetirementRotationTest.php` | Legacy schema/data conversion; secret, key-version, and application-key rotation; restored-source rejection across definitions; survivor resolution; audit access and idempotent replay; other-tenant refusal |
+| L01, C02, C05 | `tests/Feature/RetirementLedgerMigrationTest.php`, `tests/Feature/MigrationEngineTest.php` | Exact metadata/ciphertext preservation, unknown-domain refusal, conflict rollback, retryable conversion, empty install without a key, safe downgrade refusal |
+| A03–A05 | `tests/Unit/Merging/LedgerScopeGuardTest.php` | Historical tenant/model/domain verification after scope-hash rotation; missing metadata denied |
+
+The migration and deployment requirements are in
+[retirement-identity-upgrade.md](retirement-identity-upgrade.md). This follow-up
+does not complete the remaining per-record policy or scan-housekeeping work.
+
 ## Review regressions — 22 October 2026
 
 These checks supplement the original case map. The installed Filament 5 lane and

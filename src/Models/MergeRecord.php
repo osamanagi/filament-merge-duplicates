@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
  * @property string $operation_id
  * @property string $scope_id
  * @property string $retirement_domain
+ * @property int $retirement_domain_version
  * @property string $source_id
  * @property string $source_id_type
  * @property string $survivor_id

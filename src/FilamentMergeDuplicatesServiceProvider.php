@@ -249,6 +249,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
             '2026_10_02_000004_create_filament_merge_duplicates_dismissals_table',
             '2026_10_02_000005_create_filament_merge_duplicates_previews_table',
             '2026_10_02_000006_create_filament_merge_duplicates_merges_table',
+            '2026_10_22_000007_stabilize_filament_merge_duplicates_retirement_domains',
         ];
     }
 }

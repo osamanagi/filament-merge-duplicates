@@ -91,6 +91,7 @@ trait ExecutionHarness
         $schema = Schema::connection($engine);
 
         return $schema->hasTable('filament_merge_duplicates_scopes')
+            && $schema->hasColumn('filament_merge_duplicates_merges', 'retirement_domain_version')
             && $schema->hasTable('fixture_contacts')
             && $schema->hasTable('fixture_notes');
     }

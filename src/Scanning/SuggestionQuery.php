@@ -144,6 +144,8 @@ final class SuggestionQuery
 
     private function membershipQuery(DuplicateDefinition $definition, DuplicateContext $context, string $generation): Builder
     {
+        $this->retirement->assertMigrated($context->connection);
+
         $model = $definition->model();
 
         /** @var Model $instance */

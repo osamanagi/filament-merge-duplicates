@@ -2,6 +2,9 @@
 
 Status: accepted (M0)
 
+Implementation correction: [ADR 0010](0010-stable-retirement-domains.md) defines
+the stable version-2 digest and the migration from the original HMAC code.
+
 ## Context
 
 After a successful merge the source row is soft-deleted and a terminal ledger

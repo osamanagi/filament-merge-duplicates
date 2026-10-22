@@ -37,3 +37,16 @@ it('reports a live record as not retired', function () {
         RecordId::fromModel($contact),
     ))->toBeFalse();
 });
+
+it('keeps permanent identity independent of matching and application key configuration', function () {
+    $original = (new RetirementResolver)->domainDigest('testing', Contact::class, 'fixture');
+    config([
+        'merge-duplicates.secret' => 'rotated-secret',
+        'merge-duplicates.key_version' => 'v99',
+        'app.key' => 'rotated-application-key',
+    ]);
+
+    expect((new RetirementResolver)->domainDigest('testing', Contact::class, 'fixture'))->toBe($original)
+        ->and((new RetirementResolver)->domainDigest('other-connection', Contact::class, 'fixture'))->not->toBe($original)
+        ->and((new RetirementResolver)->domainDigest('testing', 'AnotherModel', 'fixture'))->not->toBe($original);
+});

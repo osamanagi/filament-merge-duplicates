@@ -8,19 +8,21 @@ use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Exceptions\ForbiddenOperation;
 use Nagi\FilamentMergeDuplicates\Exceptions\RecordUnavailable;
 use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
-use Nagi\FilamentMergeDuplicates\Models\ScopeRecord;
 
 /**
  * Reads merge history.
  *
  * History needs its own permission: being allowed to merge is not the same as
- * being allowed to read what other actors merged. The entry is decrypted only
- * after both the permission and the data scope check pass, so a caller cannot
- * use it to read another scope's history.
+ * being allowed to read what other actors merged. The scope guard verifies the
+ * original scope hash or authenticated historical tenant metadata after key
+ * rotation. No payload is returned until authorization and scope both pass.
  */
 final class AuditReader
 {
-    public function __construct(private readonly AuditWriter $audit) {}
+    public function __construct(
+        private readonly AuditWriter $audit,
+        private readonly LedgerScopeGuard $scopeGuard = new LedgerScopeGuard,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -44,13 +46,7 @@ final class AuditReader
             throw new RecordUnavailable('This merge history entry does not exist.');
         }
 
-        $scope = ScopeRecord::on($definition->connection())->where('id', $record->scope_id)->first();
-
-        if (! $scope instanceof ScopeRecord || (string) $scope->scope_hash !== $context->scopeHash) {
-            throw new ForbiddenOperation('This merge history entry belongs to a different scope.');
-        }
-
-        return $this->audit->decode((string) $record->audit_payload);
+        return $this->scopeGuard->read($context, $definition, $record, $this->audit);
     }
 
     /**

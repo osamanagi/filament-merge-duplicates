@@ -109,7 +109,7 @@ but neither has to be published: the package ships working defaults.
 | `definitions` | `[]` | Definition classes the registry resolves. A queued worker resolves them from here, so this is the whole list, not a per-panel list. |
 | `connection` | `null` | Connection the package tables live on. `null` means the merged model's own connection, which must be the same one. |
 | `secret` | `null` | HMAC secret for matching keys. `null` falls back to `app.key`. |
-| `key_version` | `'v1'` | Part of the key digest. Keep stable after merging; see the rotation limitation below. |
+| `key_version` | `'v1'` | Part of matching and scope HMACs. Changing it requires fresh scans; permanent retirement domains remain stable after the identity upgrade. |
 | `preview.ttl_minutes` | `15` | How long a merge preview stays confirmable. An expired preview has to be rebuilt. |
 | `scan.chunk_size` | `1000` | Records per chunk job. Keyset paging, never offsets. |
 | `relations.max_children_per_merge` | `500` | Above this a merge is blocked with an explanation instead of truncated. |
@@ -118,14 +118,14 @@ but neither has to be published: the package ships working defaults.
 
 Two things to know before you configure anything:
 
-- Matching keys are stored as HMAC digests, never as raw values. **Keep the
-  matching secret and `key_version` stable after the first merge.** Terminal
-  retirement domains currently use the same versioned HMAC: changing either
-  prevents old ledger mappings from being found, so a rescan alone is insufficient.
-  This also applies to `app.key` when no separate matching secret is configured.
-  Rotation needs a ledger migration before it is safe; see
-  [the review](docs/implementation-review.md). Matching keys are not portable
-  between applications.
+- Matching keys are stored as HMAC digests, never as raw values. Rotating the
+  matching secret or `key_version` requires fresh scans and invalidates old
+  matching-derived state. Permanent retirement domains are independent of these
+  keys. **Existing installations must apply the retirement-domain migration using
+  their original definitions and key settings before rotating keys.** Follow
+  [the identity upgrade procedure](docs/retirement-identity-upgrade.md). When
+  rotating `APP_KEY`, retain previous encryption keys to keep audit data readable.
+  Matching keys are not portable between applications.
 - Pruning finished scans, their memberships and dismissals is not implemented,
   so those rows accumulate. The unused retention settings have been removed. Expired
   previews are pruned by `filament-merge-duplicates:prune`, and the merge ledger is

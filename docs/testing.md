@@ -1,5 +1,30 @@
 # Testing
 
+## Permanent identity follow-up — 22 October 2026
+
+The final stable-retirement implementation was verified sequentially against both
+local MySQL and PostgreSQL engines, so the two compatibility lanes did not share
+test databases concurrently:
+
+| Lane | Framework versions | Result |
+| --- | --- | --- |
+| Installed Filament 5 | Filament 5.9.0, Livewire 4.4.7, Laravel 12.69.3, PHP 8.4.8 | 701 passed, 1 skipped, 2,064 assertions; 98.0% `src/` line coverage with pcov |
+| Isolated current Filament 4 | Filament 4.15.3, Livewire 3.8.11, Laravel 12.70.1, PHP 8.4.8 | 701 passed, 1 skipped, 2,064 assertions; coverage not measured in this lane |
+
+The skipped case in each invocation is the opt-in 100,000-record benchmark.
+The prior benchmark result remains recorded below; it was not rerun for this
+follow-up. The new `RetirementLedgerMigrator` and `LedgerScopeGuard` services each
+have 100% measured line coverage in the Filament 5 run. PHPStan level 5, Pint, and
+strict Composer validation passed. Dependency lower bounds and manual browser
+journeys were not rerun, and the original 100% package-wide coverage requirement
+is still unmet. Current dependency versions came from the isolated lane's
+resolution; this checkout's dependency files were not changed.
+
+See [ADR 0010](adr/0010-stable-retirement-domains.md) for the identity decision and
+[retirement-identity-upgrade.md](retirement-identity-upgrade.md) for deployment.
+
+## Test organization
+
 Pest is the single test runner. Tests are organised by what they prove:
 
 | Directory | Proves | Mocking policy |

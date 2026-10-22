@@ -3,9 +3,10 @@
 namespace Nagi\FilamentMergeDuplicates\Retirement;
 
 use Illuminate\Database\Query\Builder;
-use Nagi\FilamentMergeDuplicates\Data\KeyHasher;
+use Illuminate\Support\Facades\DB;
 use Nagi\FilamentMergeDuplicates\Data\RecordId;
 use Nagi\FilamentMergeDuplicates\Data\TupleEncoder;
+use Nagi\FilamentMergeDuplicates\Exceptions\InvalidConfiguration;
 use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
 
 /**
@@ -19,14 +20,28 @@ use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
  */
 final class RetirementResolver
 {
-    public function __construct(private readonly KeyHasher $hasher) {}
+    public const DOMAIN_VERSION = 2;
 
     public function domainDigest(string $connection, string $modelAlias, string $ownershipDomain): string
     {
-        return $this->hasher->hash(
-            ['retirement-domain'],
-            TupleEncoder::encodeStrings([$connection, $modelAlias, $ownershipDomain]),
+        return hash(
+            'sha256',
+            TupleEncoder::encodeStrings(['retirement-domain:v2', $connection, $modelAlias, $ownershipDomain]),
         );
+    }
+
+    /**
+     * Unconverted domains cannot be safely looked up after matching-key rotation.
+     * Refuse operations until all legacy rows on this connection are migrated.
+     */
+    public function assertMigrated(string $connection): void
+    {
+        if (DB::connection($connection)->table('filament_merge_duplicates_merges')
+            ->where('retirement_domain_version', 1)->exists()) {
+            throw new InvalidConfiguration(
+                'The retirement ledger contains legacy identities. Run the retirement-domain migration with all original definitions and matching key settings before scanning or merging.',
+            );
+        }
     }
 
     public function isRetired(
@@ -68,6 +83,8 @@ final class RetirementResolver
 
     private function retiredQuery(string $connection, string $modelAlias, string $ownershipDomain): Builder
     {
+        $this->assertMigrated($connection);
+
         return MergeRecord::on($connection)
             ->newQuery()
             ->getQuery()

@@ -121,9 +121,9 @@ different event semantics.
   the WriterGuard protocol and on the declared reference inventory being complete.
 - Soft-delete restore is **not** an unmerge.
 - Scans, memberships and dismissals are **not pruned**: only expired previews are.
-- Secret or `key_version` rotation after merging requires a terminal-ledger
-  migration. A rescan alone does not preserve retirement lookup; see
-  [implementation review](implementation-review.md).
+- Existing installations must convert legacy terminal domains before rotating
+  keys. Upgraded terminal identity is stable across subsequent key rotation;
+  see [the identity upgrade procedure](retirement-identity-upgrade.md).
 - Merge execution is **not** queued: it runs inside the request that confirms it. Scans
   are queued and chunked.
 - There is **no bulk or automatic merge**, and no unmerge.

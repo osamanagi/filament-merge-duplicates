@@ -22,9 +22,10 @@ return [
     |--------------------------------------------------------------------------
     |
     | Matching keys are persisted as HMAC-SHA256 digests, never as raw matched
-    | values. Keep the secret and key version stable after merging: retirement
-    | domains currently share this HMAC. Rotation needs a ledger migration as
-    | well as a rescan; see docs/implementation-review.md.
+    | values. Rotation invalidates matching-derived state and requires a rescan.
+    | Permanent retirement domains do not depend on these keys. Existing ledgers
+    | must be upgraded with their original settings before rotation; see
+    | docs/retirement-identity-upgrade.md.
     |
     */
 

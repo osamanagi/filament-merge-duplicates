@@ -68,6 +68,7 @@ final class MergeExecutor
         private readonly RetryPolicy $retries = new RetryPolicy,
         private readonly array $supportedDrivers = ['mysql', 'pgsql'],
         private readonly string $keyVersion = 'v1',
+        private readonly LedgerScopeGuard $scopeGuard = new LedgerScopeGuard,
     ) {}
 
     /**
@@ -329,13 +330,7 @@ final class MergeExecutor
             throw new ForbiddenOperation('This merge operation belongs to a different actor.');
         }
 
-        $scope = ScopeRecord::on($definition->connection())->where('id', $record->scope_id)->first();
-
-        if (! $scope instanceof ScopeRecord || (string) $scope->scope_hash !== $context->scopeHash) {
-            throw new ForbiddenOperation('This merge operation belongs to a different scope.');
-        }
-
-        $audit = $this->audit->decode((string) $record->audit_payload);
+        $audit = $this->scopeGuard->read($context, $definition, $record, $this->audit);
 
         $recordedChoices = $this->choicesOf($audit);
         ksort($recordedChoices);
@@ -632,6 +627,7 @@ final class MergeExecutor
                 $definition->model(),
                 $definition->ownershipDomain(),
             ),
+            'retirement_domain_version' => RetirementResolver::DOMAIN_VERSION,
             'source_id' => $plan->sourceId->value,
             'source_id_type' => $plan->sourceId->type->value,
             'survivor_id' => $plan->survivorId->value,

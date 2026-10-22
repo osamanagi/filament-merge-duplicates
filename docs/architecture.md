@@ -30,7 +30,7 @@ outside the panel must not bypass authorization.
 | `src/Data` | Key hashing, ID codecs, typed tuple encoding, field codecs |
 | `src/Scanning` | `ScopeManager`, `KeyBuilder`, `ScanChunkProcessor`, `ScanCoordinator`, `SuggestionQuery`, `DismissalService`, `ScanState` |
 | `src/Merging` | `MergePlanner`, `MergeExecutor`, `Fingerprinter`, `FieldDiffBuilder`, `SurvivorRecommender`, `RelationPlanBuilder`, `MergePlan`, `MergeResult`, `MergeContext`, `PreviewStore`, `LockManager`, `RetryPolicy`, `AuditWriter`, `AuditReader` |
-| `src/Retirement` | `RetirementResolver`, `SurvivorResolver` and the retirement domain digest |
+| `src/Retirement` | `RetirementResolver`, `SurvivorResolver`, stable retirement domains, and legacy-ledger conversion |
 | `src/Definitions` | `DefinitionRegistry` in addition to the base class and builders |
 | `src/Relations` | `HasManyTransfer`, `LockingWriterGuard` and the relation inventory validator |
 | `src/Authorization` | Default deny-by-default authorizer |
@@ -64,6 +64,7 @@ Recorded as ADRs:
 - [0001 — Scope identity](adr/0001-scope-identity.md)
 - [0002 — Visibility, counts and background scans](adr/0002-visibility-and-counts.md)
 - [0003 — Retirement identity](adr/0003-retirement-identity.md)
+- [0010 — Stable retirement domains and legacy conversion](adr/0010-stable-retirement-domains.md)
 - [0004 — Concurrency, lock ordering and the WriterGuard protocol](adr/0004-concurrency-and-writer-guard.md)
 - [0005 — Audit content, encryption and retention](adr/0005-audit-and-encryption.md)
 - [0006 — Record ID and field value codecs](adr/0006-id-and-field-codecs.md)

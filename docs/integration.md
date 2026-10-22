@@ -107,6 +107,12 @@ knowing before you add one:
 
 ## Retirement is terminal, not reversible
 
+Terminal identity is independent of matching secrets and key versions after the
+version-2 identity migration. Existing installations must convert their ledger
+with the original definitions and key settings before rotation. Follow
+[the retirement-identity upgrade](retirement-identity-upgrade.md); application-key
+rotation also requires retaining previous encryption keys for historical audits.
+
 The source is soft-deleted and a ledger row maps it to the survivor in the same
 transaction. Restoring the row outside the package is not an unmerge: the ledger
 still marks it as merged, so it is excluded from scans, from pair selection and
