@@ -72,12 +72,12 @@ final class HasManyTransfer
      *
      * @return array{moved: list<string>, count: int}
      */
-    public function transfer(RelationStrategy $strategy, Model $survivor, Model $source): array
+    public function transfer(RelationStrategy $strategy, Model $survivor, Model $source, ?callable $authorize = null): array
     {
         $relation = $this->relation($strategy, $source);
         $foreignKey = $relation->getForeignKeyName();
         $survivorKey = $survivor->getKey();
-        $children = $this->children($relation, $strategy);
+        $children = $this->children($relation, $strategy, $source->getConnection()->transactionLevel() > 0);
 
         if (count($children) > $this->maxChildrenPerMerge) {
             throw new MergeTooLarge(sprintf(
@@ -90,6 +90,10 @@ final class HasManyTransfer
         $moved = [];
 
         foreach ($children as $child) {
+            if ($authorize !== null) {
+                $authorize($child);
+            }
+
             $child->setAttribute($foreignKey, $survivorKey);
 
             if ($child->save() === false) {
@@ -142,18 +146,34 @@ final class HasManyTransfer
         return $relation;
     }
 
-    /**
-     * @return iterable<int, Model>
-     */
-    private function children(HasMany $relation, RelationStrategy $strategy): iterable
+    /** @return list<Model> */
+    public function childrenFor(RelationStrategy $strategy, Model $source, bool $lock = false): array
     {
-        $query = $relation->getQuery();
+        $children = $this->children($this->relation($strategy, $source), $strategy, $lock);
+
+        if (count($children) > $this->maxChildrenPerMerge) {
+            throw new MergeTooLarge('The declared child inventory exceeds the configured merge cap.');
+        }
+
+        return $children;
+    }
+
+    /**
+     * @return list<Model>
+     */
+    private function children(HasMany $relation, RelationStrategy $strategy, bool $lock = false): array
+    {
+        $query = clone $relation->getQuery();
 
         if ($strategy->includesSoftDeletedChildren() && $this->usesSoftDeletes($relation)) {
             $query = $query->withoutGlobalScope(SoftDeletingScope::class);
         }
 
-        /** @var iterable<int, Model> $children */
+        if ($lock) {
+            $query->reorder($relation->getRelated()->getQualifiedKeyName())->lockForUpdate();
+        }
+
+        /** @var list<Model> $children */
         $children = $query->limit($this->maxChildrenPerMerge + 1)->get()->all();
 
         return $children;

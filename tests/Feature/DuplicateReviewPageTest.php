@@ -64,6 +64,7 @@ function reviewPageDefinition(
         'authorizer' => new AbilityMapAuthorizer(
             array_map(static fn (string $ability): Ability => Ability::from($ability), $abilities),
             'actor-1',
+            allowAllRecords: true
         ),
     ]);
 
@@ -519,7 +520,7 @@ it('refuses the page when no trusted context can be resolved', function () {
         'id' => 'fixture-review-contextless',
         'model' => Contact::class,
         'label' => 'Record',
-        'authorizer' => new AbilityMapAuthorizer([Ability::Review], 'actor-1'),
+        'authorizer' => new AbilityMapAuthorizer([Ability::Review], 'actor-1', allowAllRecords: true),
         'contextResolver' => new PanelContextResolver(actorRef: null),
     ]);
 
@@ -582,7 +583,7 @@ it('renders without the scan and merge controls when the actor has gone', functi
         'model' => Contact::class,
         'label' => 'Record',
         'scopeKeys' => ['tenant_id'],
-        'authorizer' => new AbilityMapAuthorizer([Ability::Review, Ability::Scan, Ability::Merge], 'actor-1'),
+        'authorizer' => new AbilityMapAuthorizer([Ability::Review, Ability::Scan, Ability::Merge], 'actor-1', allowAllRecords: true),
         'contextResolver' => $resolver,
     ]);
 

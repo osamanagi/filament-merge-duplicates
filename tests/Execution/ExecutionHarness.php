@@ -16,6 +16,7 @@ use Nagi\FilamentMergeDuplicates\Merging\AuditWriter;
 use Nagi\FilamentMergeDuplicates\Merging\MergePlan;
 use Nagi\FilamentMergeDuplicates\Merging\MergePlanner;
 use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
+use Nagi\FilamentMergeDuplicates\Models\PreviewRecord;
 use Nagi\FilamentMergeDuplicates\Retirement\RetirementResolver;
 use Nagi\FilamentMergeDuplicates\Scanning\ScopeManager;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Contact;
@@ -186,7 +187,7 @@ trait ExecutionHarness
                 Ability::Scan,
                 Ability::Merge,
                 Ability::ViewAudit,
-            ], 'actor-1'),
+            ], 'actor-1', allowAllRecords: true),
             'matchingRules' => [
                 ExactRule::make('reference')->fields(['reference']),
                 ExactRule::make('display-name')->fields(['display_name']),
@@ -324,14 +325,19 @@ trait ExecutionHarness
             ->where('definition_id', $definition->id())
             ->value('id');
 
+        $preview = PreviewRecord::on($engine)->where('operation_id', $operationId)->firstOrFail();
+        $payload = json_decode(Crypt::decryptString($preview->plan_payload), true, flags: JSON_THROW_ON_ERROR);
+        $source = RecordId::decode($payload['source_id']);
+        $survivor = RecordId::decode($payload['survivor_id']);
+
         return MergeRecord::on($engine)->create([
             'operation_id' => $operationId,
             'scope_id' => (string) $scopeId,
             'retirement_domain' => 'replayed-operation-domain',
-            'source_id' => '2',
-            'source_id_type' => RecordIdType::Int->value,
-            'survivor_id' => '1',
-            'survivor_id_type' => RecordIdType::Int->value,
+            'source_id' => $source->value,
+            'source_id_type' => $source->type->value,
+            'survivor_id' => $survivor->value,
+            'survivor_id_type' => $survivor->type->value,
             'actor_ref' => $actor,
             'definition_revision' => $definition->revision(),
             'audit_payload' => app(AuditWriter::class)->encode($audit),

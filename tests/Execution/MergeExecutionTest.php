@@ -1,12 +1,13 @@
 <?php
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
 use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
-use Nagi\FilamentMergeDuplicates\Contracts\MergeAuthorizer;
+use Nagi\FilamentMergeDuplicates\Contracts\RecordMergeAuthorizer;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Data\RecordId;
 use Nagi\FilamentMergeDuplicates\Events\MergeCompleted;
@@ -237,7 +238,7 @@ it('refuses a reused token presented by another actor', function (string $engine
             Ability::Review,
             Ability::Merge,
             Ability::ViewAudit,
-        ]),
+        ], allowAllRecords: true),
     ]);
 
     $context = $this->contextFor($definition, 'actor-1');
@@ -292,11 +293,26 @@ it('refuses a preview presented in another scope', function (string $engine) {
 it('aborts when the permission is revoked between the preview and the execution', function (string $engine) {
     $this->bootEngine($engine);
 
-    $authorizer = new class implements MergeAuthorizer
+    $authorizer = new class implements RecordMergeAuthorizer
     {
         public bool $allow = true;
 
         public function allows(DuplicateContext $context, Ability $ability): bool
+        {
+            return $this->allow;
+        }
+
+        public function allowsView(DuplicateContext $context, Model $record): bool
+        {
+            return $this->allow;
+        }
+
+        public function allowsPair(DuplicateContext $context, Model $survivor, Model $source): bool
+        {
+            return $this->allow;
+        }
+
+        public function allowsChildTransfer(DuplicateContext $context, Model $child, Model $survivor, Model $source, string $relation): bool
         {
             return $this->allow;
         }
@@ -336,12 +352,11 @@ it('refuses a second merge of a source that was already merged away', function (
     $plan = $this->planFor($context, $definition, $first, $second);
     app(MergeExecutor::class)->execute($context, $definition, $plan->operationId, ['reference' => 'source']);
 
-    // The source of the first merge is retired, so a competing merge that would
-    // move it again is blocked at planning time.
-    $competing = $this->planFor($context, $definition, $third, $second->refresh());
-
-    expect($competing->isConfirmable())->toBeFalse()
-        ->and(implode(' | ', $competing->blockers))->toContain('already retired');
+    // The retired source is outside the live scope, even when a caller passes
+    // its model directly to the planner. Restored sources are tested below.
+    expect(fn () => $this->planFor($context, $definition, $third, $second->refresh()))
+        ->toThrow(RecordUnavailable::class);
+    expect(MergeRecord::on($engine)->count())->toBe(1);
 })->with('engines');
 
 it('keeps a source terminal even after it is restored by an external process', function (string $engine) {
@@ -446,7 +461,7 @@ it('records history that needs the audit ability and the same scope to read', fu
         ->and($audit['fields'][0]['after']['value'])->toBe('TWO');
 
     $withoutAudit = $this->makeDefinition([
-        'authorizer' => new AbilityMapAuthorizer([Ability::Merge], 'actor-1'),
+        'authorizer' => new AbilityMapAuthorizer([Ability::Merge], 'actor-1', allowAllRecords: true),
     ]);
 
     expect(fn () => app(AuditReader::class)->forOperation($context, $withoutAudit, $plan->operationId))

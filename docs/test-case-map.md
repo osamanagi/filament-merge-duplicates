@@ -1,5 +1,22 @@
 # Test-case map
 
+## Scan maintenance follow-up — 23 October 2026
+
+| Case families | Tests | Behavior |
+| --- | --- | --- |
+| S01–S02 | `tests/Feature/ScanMaintenanceTest.php` | Queued and running scans with stale or missing heartbeats fail atomically as `scan_abandoned`; recent work remains active; the recovery command is usable by a scheduler. |
+| S01, P01 | `tests/Feature/PruneCommandTest.php` | Retention removes only old terminal unpublished scan generations and their memberships; current published data remains readable. |
+
+## Record authorization follow-up — 23 October 2026
+
+| Case families | Tests | Behavior |
+| --- | --- | --- |
+| A01–A05, R03–R04, M06 | `tests/Execution/RecordAuthorizationTest.php` | Real Laravel policies on MySQL/PostgreSQL: mixed parent/child permissions, exact transfer target, direction changes, revocation after preview and during writes, full rollback, soft-deleted children, child locks before writes, scoped read-only replay |
+| A02, A05 | `tests/Execution/MergePageJourneyTest.php` | Forged Livewire confirmation state cannot bypass a revoked child policy |
+| A04, C02 | `tests/Unit/Authorization/RecordAuthorizerTest.php`, `tests/Feature/DefinitionValidationTest.php`, `tests/Feature/MergePlannerTest.php` | Explicit actor binding, default denial, missing policies, context mismatch, operation-only detection compatibility, direct planner model/scope refusal |
+
+Integration and compatibility changes: [record authorization](record-authorization.md).
+
 ## Permanent identity follow-up — 22 October 2026
 
 | Case families | Tests | Behavior |
@@ -10,7 +27,8 @@
 
 The migration and deployment requirements are in
 [retirement-identity-upgrade.md](retirement-identity-upgrade.md). This follow-up
-does not complete the remaining per-record policy or scan-housekeeping work.
+addresses permanent identity; the record-policy follow-up is listed above.
+Scan housekeeping remains outstanding.
 
 ## Review regressions — 22 October 2026
 
@@ -80,7 +98,7 @@ test that proves it or recorded as an explicit supported boundary.
 | --- | --- | --- | --- |
 | R01 | passing | `tests/Execution/MergeExecutionTest.php` | A merge moves every declared child to the survivor exactly once, and the retired source keeps its unique values and its row. The transfer is proven on real MySQL and PostgreSQL. |
 | R02 | passing | `tests/Feature/MergePlannerTest.php`, `tests/Unit/Merging/RelationPlanBuilderTest.php`, `tests/Execution/MergeRollbackTest.php` | A transfer that would collide with an existing child on a per-parent composite unique constraint is blocked before anything is written - reported by the planner and again by the relation plan builder - and R07 proves the rollback the blocker exists to avoid. |
-| R03 | passing | `tests/Execution/MergeGuardsTest.php` | Soft-deleted children move when the definition declares that ownership transfer is required, and stay with the retired source when it does not - the declared inventory is the inventory that moves. A global scope the host puts on the child model decides what counts as a child, and the preview counts exactly what the transfer will move, so a merge is never offered that the transfer could not finish. Child-level *authorization* remains the host's scope's business and is documented as such in `docs/integration.md`. |
+| R03 | passing | `tests/Execution/MergeGuardsTest.php` | Soft-deleted children move when the definition declares that ownership transfer is required, and stay with the retired source when it does not - the declared inventory is the inventory that moves. A global scope the host puts on the child model decides what counts as a child, and the preview counts exactly what the transfer will move, so a merge is never offered that the transfer could not finish. Every included child additionally requires explicit view, update and transfer authorization; see `tests/Execution/RecordAuthorizationTest.php`. |
 | R04 | passing | `tests/Execution/MergeGuardsTest.php`, `tests/Execution/MergeRollbackTest.php` | No partial subset can be merged. A child write the database refuses aborts the whole merge, a child a host scope excludes is never part of the inventory, and a cancelled child save rolls back fields, siblings, retirement and the ledger entry together. The boundary is recorded: the plugin can only account for children the declared relation returns, so a child the relation cannot see is not the plugin's to move. |
 | R05 | passing | `tests/Feature/MergePlannerTest.php`, `tests/Feature/DefinitionValidationTest.php`, `tests/Unit/Merging/RelationPlanBuilderTest.php` | Relation types v1 cannot transfer (has-one, belongs-to-many, morph-many, media library) are rejected as configuration blockers instead of being guessed, an unsupported type declared inline is rejected the same way, and a relation that reaches a model on another connection is refused as well: its child writes would live outside the merge transaction and could not be rolled back with it. |
 | R06 | passing | `tests/Feature/MergePlannerTest.php` | A transfer above the configured cap is blocked with the configured limit, and the boundary value is allowed. |

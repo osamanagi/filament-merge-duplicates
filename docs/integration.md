@@ -1,5 +1,11 @@
 # Writer and observer integration
 
+Merge permission includes both an operation grant and explicit policies for the
+survivor, source and transferred children. Configure the
+[record authorization contract](record-authorization.md) before enabling merges.
+Eloquent saves do not run Laravel authorization automatically; the executor
+performs these checks explicitly within its transaction.
+
 A merge moves declared children onto the survivor and retires the source. That
 touches rows the rest of an application also writes, so the package and the host
 have to agree on one protocol. This page is the host's half.

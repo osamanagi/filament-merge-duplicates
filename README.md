@@ -88,11 +88,14 @@ is not a 404:
 php artisan filament:assets
 ```
 
-Schedule the prune command if you want expired merge previews cleaned up. They are
-refused as stale whether or not they are pruned, so this is housekeeping rather than
-correctness:
+Schedule recovery frequently and pruning daily. Recovery fails a queued or running
+scan once it stops heartbeating, so the scope is available for an authorized retry;
+it never guesses an actor or requeues work under a stale identity. Pruning removes
+expired previews and old unpublished scan generations, never current results,
+dismissals or merge history:
 
 ```php
+$schedule->command('filament-merge-duplicates:recover-scans')->everyMinute();
 $schedule->command('filament-merge-duplicates:prune')->daily();
 ```
 
@@ -126,11 +129,10 @@ Two things to know before you configure anything:
   [the identity upgrade procedure](docs/retirement-identity-upgrade.md). When
   rotating `APP_KEY`, retain previous encryption keys to keep audit data readable.
   Matching keys are not portable between applications.
-- Pruning finished scans, their memberships and dismissals is not implemented,
-  so those rows accumulate. The unused retention settings have been removed. Expired
-  previews are pruned by `filament-merge-duplicates:prune`, and the merge ledger is
-  never pruned. See [docs/support-matrix.md](docs/support-matrix.md) for the exact
-  boundary.
+- `scan.heartbeat_timeout_minutes` controls when recovery fails abandoned queued
+  or running work. `retention.scans_days` controls pruning of terminal unpublished
+  scans and memberships. Dismissals and the merge ledger are never pruned. See
+  [docs/support-matrix.md](docs/support-matrix.md) for the exact boundary.
 
 ## Walkthrough: two unrelated resources in one panel
 
@@ -149,8 +151,9 @@ may be merged, who may do it and how a source is retired.
 namespace App\MergeDuplicates;
 
 use App\Models\Shop\Customer;
+use Illuminate\Contracts\Auth\Access\Gate;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
-use Nagi\FilamentMergeDuplicates\Authorization\AbilityMapAuthorizer;
+use Nagi\FilamentMergeDuplicates\Authorization\GateMergeAuthorizer;
 use Nagi\FilamentMergeDuplicates\Contracts\ContextResolver;
 use Nagi\FilamentMergeDuplicates\Contracts\MergeAuthorizer;
 use Nagi\FilamentMergeDuplicates\Contracts\MergeValidator;
@@ -231,13 +234,20 @@ final class CustomerDuplicates extends DuplicateDefinition
 
     public function authorizer(): MergeAuthorizer
     {
-        return new AbilityMapAuthorizer([
-            Ability::Review,
-            Ability::Dismiss,
-            Ability::Scan,
-            Ability::Merge,
-            Ability::ViewAudit,
-        ]);
+        $resolver = $this->contextResolver();
+
+        return new GateMergeAuthorizer(
+            gate: app(Gate::class),
+            actor: auth()->user(), // Use the same guard as PanelActorResolver.
+            actorRef: $resolver->actorRef(),
+            abilities: [
+                Ability::Review->value => 'duplicates.review',
+                Ability::Dismiss->value => 'duplicates.dismiss',
+                Ability::Scan->value => 'duplicates.scan',
+                Ability::Merge->value => 'duplicates.merge',
+                Ability::ViewAudit->value => 'duplicates.audit',
+            ],
+        );
     }
 
     public function validator(): ?MergeValidator
@@ -263,6 +273,12 @@ lists the contracts and what each implementation has to guarantee. A definition 
 rejected with a blocker when it cannot merge safely — no soft deletes on the model,
 no explicit retirement strategy, no validator, no writer guard, or an unacknowledged
 reference inventory.
+
+Register those operation abilities with Laravel's Gate. The adapter also requires
+model `view`, survivor `update`, source `delete`, and child `update` and
+`transferForMerge` policies. Missing grants deny access. Bind the actor from the
+same trusted guard/context in web requests and service entry points; see
+[record authorization](docs/record-authorization.md) for policy examples and upgrades.
 
 ### 2. Register the definitions and enable the panel
 
@@ -434,7 +450,9 @@ Every operation is authorized separately, and the defaults deny:
 The definition's `authorizer()` answers them. The pages, the banner and the CLI go
 through services that check the ability themselves, so a forgotten check at a call
 site cannot widen access. A suggestion never authorizes a merge: review and merge
-are different abilities.
+are different abilities. Merge-capable definitions must also implement
+`RecordMergeAuthorizer`; the provided `GateMergeAuthorizer` checks the actual
+pair and every child before writes and rechecks permissions at execution.
 
 Depth on every contract, DTO, event and error code:
 [docs/api-reference.md](docs/api-reference.md) and [docs/errors.md](docs/errors.md).

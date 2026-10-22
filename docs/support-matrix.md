@@ -110,7 +110,8 @@ different event semantics.
 | Row | Pruned by | Notes |
 | --- | --- | --- |
 | Merge previews | `filament-merge-duplicates:prune` | Also refused as stale on read once expired, so pruning is housekeeping, not correctness. |
-| Scans, memberships, dismissals | Nothing yet | These rows accumulate until a prune path is written. |
+| Unpublished terminal scans and memberships | `filament-merge-duplicates:prune` | Retained for `retention.scans_days` (30 by default). The current published generation is preserved. |
+| Dismissals | Never | A dismissal remains valid until matching inputs or configuration change. |
 | Merge ledger and its audit payload | Never | A terminal source mapping has to outlive the record it refers to. |
 
 ## Explicit non-claims
@@ -120,7 +121,7 @@ different event semantics.
 - No "zero data loss" claim. The guarantee is conditional on the host upholding
   the WriterGuard protocol and on the declared reference inventory being complete.
 - Soft-delete restore is **not** an unmerge.
-- Scans, memberships and dismissals are **not pruned**: only expired previews are.
+- The current published generation, dismissals, and merge history are never pruned automatically.
 - Existing installations must convert legacy terminal domains before rotating
   keys. Upgraded terminal identity is stable across subsequent key rotation;
   see [the identity upgrade procedure](retirement-identity-upgrade.md).

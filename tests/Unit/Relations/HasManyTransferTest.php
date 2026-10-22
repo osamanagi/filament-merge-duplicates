@@ -26,6 +26,9 @@ it('refuses an inventory above the configured cap', function () {
         new CompleteHasMany('childNotes'),
         $source,
     ))->toThrow(MergeTooLarge::class);
+
+    expect(fn () => (new HasManyTransfer(maxChildrenPerMerge: 0))->childrenFor(new CompleteHasMany('childNotes'), $source))
+        ->toThrow(MergeTooLarge::class);
 });
 
 it('refuses to transfer more children than the configured cap', function () {

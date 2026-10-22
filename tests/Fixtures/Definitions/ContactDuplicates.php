@@ -119,7 +119,7 @@ final class ContactDuplicates extends DuplicateDefinition
             Ability::Dismiss,
             Ability::Scan,
             Ability::Merge,
-        ], 'actor-1');
+        ], 'actor-1', allowAllRecords: true);
     }
 
     public function validator(): ?MergeValidator

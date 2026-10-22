@@ -32,7 +32,7 @@ Hosts extend the abstract class
 | `fields(): list<MergeField>` | yes | The scalar allowlist that may be merged. |
 | `contextResolver(): ContextResolver` | yes | Resolves the trusted actor, panel and tenant. Must fail closed. |
 | `scopedRecordQuery(): ScopedRecordQuery` | yes | Restricts records to the scope and to what the actor may view. |
-| `authorizer(): MergeAuthorizer` | yes | Answers the five abilities. |
+| `authorizer(): MergeAuthorizer` | yes | Answers the five abilities; must also implement `RecordMergeAuthorizer` to merge. |
 | `recordTitleAttribute(): ?string` | no | Attribute used to label a record in the UI. |
 | `revision(): string` | no | Bump when the rules or fields change; part of the matching key. |
 | `relations(): list<RelationStrategy>` | no | Declared inbound references. Default `[]`. |
@@ -58,6 +58,7 @@ do, and what the package guarantees in return - is in
 | `ContextResolver` | `actorRef()`, `panelId()`, `tenant()`, `contextFor(definitionId, connection, scopeHash)` | Returns primitives only, and throws `MissingContext` instead of guessing. The result is persisted with a queued scan and re-established by the worker. |
 | `ScopedRecordQuery` | `constrain(Builder, DuplicateContext)`, `visibleTo(Builder, DuplicateContext)` | Both are SQL-side. `visibleTo` is what makes counts non-leaking: a filter applied in PHP after counting would leak group sizes. |
 | `MergeAuthorizer` | `allows(DuplicateContext, Ability)` | Deny by default; answer each ability independently. |
+| `RecordMergeAuthorizer` | `allowsView(context, record)`, `allowsPair(context, survivor, source)`, `allowsChildTransfer(context, child, survivor, source, relation)` | Extends `MergeAuthorizer`. Explicitly authorize each affected record and transfer target. Denying any child aborts the entire merge. See [record authorization](record-authorization.md). |
 | `MergeValidator` | `validate(DuplicateContext, array $proposed): array` | Returns per-field failures. Database constraints stay the final word; Filament form validation is never reused implicitly. |
 | `RetirementStrategy` | `id()`, `requiresSoftDeletes()` | Declares how a source is retired. v1 always soft-deletes and requires the model to support it. |
 | `WriterGuard` | `assertAcceptsNewChildren(...)` | Throws `RecordUnavailable` when a host writer is about to attach children to a retired record. |
@@ -69,7 +70,8 @@ do, and what the package guarantees in return - is in
 
 | Class | Use |
 | --- | --- |
-| `Authorization\AbilityMapAuthorizer` | Grants a fixed list of abilities, optionally to one actor reference. Handy for a demo; a real app substitutes policy checks. |
+| `Authorization\AbilityMapAuthorizer` | Grants fixed operation abilities, optionally to one actor reference. Record access defaults to denied; `allowAllRecords: true` explicitly grants it for a trusted merge actor. Prefer policies in applications. |
+| `Authorization\GateMergeAuthorizer` | Uses Laravel Gate for an explicitly resolved actor, operation mappings and model/transfer policies. No ambient-user fallback. |
 | `Authorization\DenyAllMergeAuthorizer` | Denies everything. |
 | `Authorization\ServiceContextResolver` | Explicit context for a service account: actor ref, panel id and tenant are supplied by the caller. Used by the CLI. |
 | `Authorization\NullContextResolver` | Fails closed; a definition that does not override the resolver cannot run unscoped. |
@@ -94,8 +96,7 @@ do, and what the package guarantees in return - is in
 | History | `Merging\AuditReader::forOperation(...)`, `AuditWriter` | Encrypted audit payload, keyed by operation id. Reading requires the `view-audit` ability. |
 
 `Merging\PreviewStore` keeps previews for `preview.ttl_minutes` and refuses an
-expired one with `StalePreview`. It has a `pruneExpired()` method that no command
-or schedule calls yet — see [docs/support-matrix.md](docs/support-matrix.md).
+expired one with `StalePreview`. The prune command removes expired rows.
 
 ## Scanning
 
@@ -104,6 +105,7 @@ or schedule calls yet — see [docs/support-matrix.md](docs/support-matrix.md).
 | `Scanning\ScopeManager` | Derives the scope identity, resolves the context, and ensures the scope row exists. |
 | `Scanning\ScanStarter::start(definition, context)` | The authorized seam: checks `scan`, creates the scan row and queues the first `ProcessScanChunk` job. |
 | `Scanning\ScanCoordinator` | Owns the lifecycle: `start()`, `run()` (drains inline, used by the CLI `--sync` and tests), `publish()`, `cancel()`, `fail()`. One queued or running scan per scope, enforced by a lock on the scope row. |
+| `Scanning\ScanMaintenance` | Fails scans exceeding `scan.heartbeat_timeout_minutes`; prunes old terminal unpublished generations after `retention.scans_days`. It never requeues without a trusted actor. |
 | `Jobs\ProcessScanChunk` | One chunk, re-dispatching itself while work remains; publishes only when every chunk succeeded. Carries primitives only. |
 | `Scanning\ScanChunkProcessor` | The keyset chunk reader and membership writer. Idempotent. |
 | `Scanning\DirectPairMatcher` | Re-computes the rule digests for two records so a pair that no longer matches a configured rule cannot be merged, even after a merge was accepted earlier. |
@@ -131,7 +133,8 @@ components, which is why one implementation renders on both majors.
 | Command | Options |
 | --- | --- |
 | `filament-merge-duplicates:scan {definition}` | `--actor=` (service actor reference), `--panel=cli`, `--tenant=`, `--sync` (drain inline instead of queueing). |
-| `filament-merge-duplicates:prune` | `--connection=` (the connection holding the package tables). Deletes expired preview rows and nothing else; safe to schedule daily. |
+| `filament-merge-duplicates:recover-scans` | `--connection=`. Fails stale queued/running scans with `scan_abandoned`; schedule frequently. |
+| `filament-merge-duplicates:prune` | `--connection=`. Deletes expired previews plus old terminal unpublished scans and memberships; safe to schedule daily. |
 
 ## Events
 

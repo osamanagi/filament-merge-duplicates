@@ -70,6 +70,24 @@ return [
 
     'scan' => [
         'chunk_size' => 1000,
+        // A worker that never starts or stops heartbeating is failed by the
+        // recovery command, freeing the scope for an authorized retry.
+        'heartbeat_timeout_minutes' => 15,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Derived-data retention
+    |--------------------------------------------------------------------------
+    |
+    | The prune command removes only old terminal scans that are not the
+    | current published generation, together with their memberships. Dismissals
+    | and merge history intentionally have no automatic retention policy.
+    |
+    */
+
+    'retention' => [
+        'scans_days' => 30,
     ],
 
     /*

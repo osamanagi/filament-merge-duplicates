@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
+use Nagi\FilamentMergeDuplicates\Authorization\MergeAuthorization;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 use Nagi\FilamentMergeDuplicates\Data\RecordId;
@@ -35,6 +36,7 @@ final class MergePlanner
         private readonly PreviewStore $previews,
         private readonly RetirementResolver $retirement,
         private readonly DefinitionValidator $validator,
+        private readonly MergeAuthorization $authorization,
     ) {}
 
     /**
@@ -63,6 +65,9 @@ final class MergePlanner
             throw InvalidConfiguration::for($definition->id(), implode(' ', $invalidConfiguration));
         }
 
+        $this->assertVisible($context, $definition, $first);
+        $this->assertVisible($context, $definition, $second);
+
         $firstId = RecordId::fromModel($first);
         $secondId = RecordId::fromModel($second);
 
@@ -81,6 +86,8 @@ final class MergePlanner
             $recommendation,
         );
 
+        $this->authorization->assertPair($context, $definition, $survivor, $source);
+
         $blockers = [];
 
         if ($this->retirement->isRetired(
@@ -94,6 +101,10 @@ final class MergePlanner
 
         $relationPlan = $this->relations->build($definition, $survivor, $source);
         $blockers = [...$blockers, ...$relationPlan['blockers']];
+
+        if ($relationPlan['blockers'] === []) {
+            $this->authorization->assertChildren($context, $definition, $survivor, $source);
+        }
 
         $differences = $this->fields->build($definition, $survivor, $source);
 
@@ -285,5 +296,21 @@ final class MergePlanner
         }
 
         return '#' . (string) $record->getKey();
+    }
+
+    private function assertVisible(DuplicateContext $context, DuplicateDefinition $definition, Model $record): void
+    {
+        $model = $definition->model();
+
+        if (! $record instanceof $model) {
+            throw new RecordUnavailable('This record does not belong to the configured model.');
+        }
+
+        $scoped = $definition->scopedRecordQuery();
+        $query = $scoped->constrain((new $model)->newQuery(), $context);
+
+        if (! $scoped->visibleTo($query, $context)->whereKey($record->getKey())->exists()) {
+            throw new RecordUnavailable('A record in this merge is no longer visible in the current scope.');
+        }
     }
 }

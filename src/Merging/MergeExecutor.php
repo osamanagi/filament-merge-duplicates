@@ -9,6 +9,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
+use Nagi\FilamentMergeDuplicates\Authorization\MergeAuthorization;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
 use Nagi\FilamentMergeDuplicates\Contracts\RelationStrategy;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
@@ -65,6 +66,7 @@ final class MergeExecutor
         private readonly AuditWriter $audit,
         private readonly RetirementResolver $retirement,
         private readonly DirectPairMatcher $matcher,
+        private readonly MergeAuthorization $authorization,
         private readonly RetryPolicy $retries = new RetryPolicy,
         private readonly array $supportedDrivers = ['mysql', 'pgsql'],
         private readonly string $keyVersion = 'v1',
@@ -188,6 +190,7 @@ final class MergeExecutor
             $source = $this->fetchVisible($context, $definition, $plan->sourceId);
 
             $this->assertStillMergeable($context, $definition, $plan, $survivor, $source);
+            $this->authorization->assertPair($context, $definition, $survivor, $source);
 
             // 4. The stored fingerprint covers every merge-relevant value and the
             // declared child inventory, so any material change since the preview
@@ -199,6 +202,7 @@ final class MergeExecutor
             }
 
             $this->assertRelationInventories($plan, $definition, $source);
+            $this->authorization->assertChildren($context, $definition, $survivor, $source, lock: true);
 
             $choices = $this->validatedChoices($plan, $choices);
 
@@ -208,9 +212,13 @@ final class MergeExecutor
 
             // 5. Writes.
             $writes = $this->writeFields($context, $definition, $plan, $survivor, $source, $choices);
-            $moved = $this->moveChildren($definition, $survivor, $source, $plan);
+            $moved = $this->moveChildren($context, $definition, $survivor, $source, $plan);
 
             // 6. Retirement and the terminal ledger entry, in the same transaction.
+            $survivor->refresh();
+            $source->refresh();
+            $this->assertStillMergeable($context, $definition, $plan, $survivor, $source);
+            $this->authorization->assertPair($context, $definition, $survivor, $source);
             $this->retire($source);
             $record = $this->writeLedger(
                 $context,
@@ -338,6 +346,20 @@ final class MergeExecutor
 
         if ($recordedChoices !== $choices) {
             throw new DomainConflict('This merge operation already committed with different choices.');
+        }
+
+        foreach ([$record->survivor_id, $record->source_id] as $id) {
+            $model = $definition->model();
+            $query = (new $model)->newQuery()->withoutGlobalScope(SoftDeletingScope::class);
+            $scoped = $definition->scopedRecordQuery();
+            $query = $scoped->visibleTo($scoped->constrain($query, $context), $context);
+            $visible = $query->whereKey($id)->first();
+
+            if (! $visible instanceof Model) {
+                throw new ForbiddenOperation('A record from this merge operation is no longer visible.');
+            }
+
+            $this->authorization->assertView($context, $definition, $visible);
         }
 
         return new MergeResult(
@@ -553,6 +575,7 @@ final class MergeExecutor
      * @return array{ids: array<string, list<string>>, counts: array<string, int>}
      */
     private function moveChildren(
+        DuplicateContext $context,
         DuplicateDefinition $definition,
         Model $survivor,
         Model $source,
@@ -566,7 +589,12 @@ final class MergeExecutor
                 continue;
             }
 
-            $result = $this->transfer->transfer($strategy, $survivor, $source);
+            $result = $this->transfer->transfer(
+                $strategy,
+                $survivor,
+                $source,
+                fn (Model $child) => $this->authorization->assertChild($context, $definition, $child, $survivor, $source, $strategy->name()),
+            );
             $expected = count($plan->childIdsFor($strategy->name()));
 
             if ($result['count'] !== $expected) {

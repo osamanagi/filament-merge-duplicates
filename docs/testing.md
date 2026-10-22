@@ -1,5 +1,43 @@
 # Testing
 
+## Scan maintenance follow-up — 23 October 2026
+
+Scan maintenance was verified sequentially on both compatibility lanes, each
+exercising local MySQL and PostgreSQL databases:
+
+| Lane | Framework versions | Result |
+| --- | --- | --- |
+| Installed Filament 5 | Filament 5.9.0, Livewire 4.4.7, Laravel 12.69.3, PHP 8.4.8 | 765 passed, 1 skipped, 2,247 assertions; 98.0% `src/` line coverage with pcov |
+| Isolated current Filament 4 | Filament 4.15.3, Livewire 3.8.11, Laravel 12.70.1, PHP 8.4.8 | 765 passed, 1 skipped, 2,247 assertions; coverage not measured in this lane |
+
+The focused cases cover stale queued/running recovery, missing heartbeats,
+scheduler command output, and retention of unpublished terminal generations.
+PHPStan level 5 and Pint passed. The opt-in benchmark was skipped; the original
+100% package coverage requirement remains unmet.
+
+## Record authorization follow-up — 23 October 2026
+
+The record-policy implementation was verified sequentially on both compatibility
+lanes, each exercising real local MySQL and PostgreSQL databases:
+
+| Lane | Framework versions | Result |
+| --- | --- | --- |
+| Installed Filament 5 | Filament 5.9.0, Livewire 4.4.7, Laravel 12.69.3, PHP 8.4.8 | 762 passed, 1 skipped, 2,231 assertions; 98.1% `src/` line coverage with pcov |
+| Isolated current Filament 4 | Filament 4.15.3, Livewire 3.8.11, Laravel 12.70.1, PHP 8.4.8 | 762 passed, 1 skipped, 2,231 assertions; coverage not measured in this lane |
+
+`GateMergeAuthorizer` and `MergeAuthorization` each have 100% measured line
+coverage in the Filament 5 run. PHPStan level 5, Pint, strict Composer validation,
+and diff whitespace checks passed. The isolated installation did not change the
+checkout's dependency files. The opt-in benchmark was skipped; dependency lower
+bounds and manual browser journeys were not rerun. The original requirement of
+100% package coverage on both majors remains unmet.
+
+New tests cover mixed parent/child permissions, exact transfer targets, changed
+survivor direction, policy revocation after preview and during writes, complete
+rollback, soft-deleted children, child locks before writes, forged Livewire state,
+and scoped read-only replay. See [record authorization](record-authorization.md)
+for the integration change and [the case map](test-case-map.md) for test files.
+
 ## Permanent identity follow-up — 22 October 2026
 
 The final stable-retirement implementation was verified sequentially against both

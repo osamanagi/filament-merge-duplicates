@@ -2,6 +2,7 @@
 
 namespace Nagi\FilamentMergeDuplicates\Scanning;
 
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition;
@@ -160,6 +161,39 @@ final class ScanCoordinator
         }
 
         return $scan->refresh();
+    }
+
+    /** Fails a scan only if it was still stalled when maintenance rechecked it. */
+    public function failStalled(ScanRecord $scan, CarbonInterface $before): bool
+    {
+        $updated = ScanRecord::on($scan->getConnectionName())->whereKey($scan->id)
+            ->where(function ($query) use ($before): void {
+                $query->where(function ($query) use ($before): void {
+                    $query->where('state', ScanState::Queued->value)->where('created_at', '<', $before);
+                })->orWhere(function ($query) use ($before): void {
+                    $query->where('state', ScanState::Running->value)
+                        ->where(function ($query) use ($before): void {
+                            $query->where('heartbeat_at', '<', $before)
+                                ->orWhere(function ($query) use ($before): void {
+                                    $query->whereNull('heartbeat_at')->where('created_at', '<', $before);
+                                });
+                        });
+                });
+            })
+            ->update([
+                'state' => ScanState::Failed->value,
+                'finished_at' => now(),
+                'failure_code' => 'scan_abandoned',
+            ]);
+
+        if ($updated === 0) {
+            return false;
+        }
+
+        $scan->refresh();
+        ScanFailed::dispatch($scan, 'scan_abandoned');
+
+        return true;
     }
 
     private function sanitize(Throwable $exception): string

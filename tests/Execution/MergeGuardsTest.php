@@ -186,7 +186,7 @@ it('refuses to resolve a retired record for an actor without the review ability'
     $ungranted = $this->makeDefinition([
         'authorizer' => new AbilityMapAuthorizer([
             Ability::Merge,
-        ]),
+        ], allowAllRecords: true),
     ]);
 
     expect(fn () => app(SurvivorResolver::class)->resolve(

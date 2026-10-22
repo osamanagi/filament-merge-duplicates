@@ -70,6 +70,21 @@ function mergeReadyConfig(array $overrides = []): array
     ];
 }
 
+it('leaves detection available but blocks merging for an operation-only authorizer', function () {
+    $authorizer = new class implements MergeAuthorizer
+    {
+        public function allows(DuplicateContext $context, Ability $ability): bool
+        {
+            return true;
+        }
+    };
+    $report = validateDefinition(mergeReadyConfig(['authorizer' => $authorizer]));
+
+    expect($report->detectionCapable)->toBeTrue()
+        ->and($report->mergeCapable)->toBeFalse()
+        ->and(blockerMessages($report))->toContain('RecordMergeAuthorizer');
+});
+
 it('blocks has-many relations that use an alternate parent key', function () {
     $report = validateDefinition(mergeReadyConfig([
         'relations' => [new CompleteHasMany('referenceNotes')],

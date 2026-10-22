@@ -73,6 +73,7 @@ function mergePreviewDefinition(string $id, array $abilities, array $overrides =
         'authorizer' => new AbilityMapAuthorizer(
             array_map(static fn (string $ability): Ability => Ability::from($ability), $abilities),
             'actor-1',
+            allowAllRecords: true
         ),
         ...$overrides,
     ]);
@@ -610,7 +611,7 @@ it('refuses the audit page when no trusted context can be resolved', function ()
         'id' => 'fixture-audit-unscoped',
         'model' => Contact::class,
         'contextResolver' => new NullContextResolver,
-        'authorizer' => new AbilityMapAuthorizer([Ability::ViewAudit]),
+        'authorizer' => new AbilityMapAuthorizer([Ability::ViewAudit], allowAllRecords: true),
     ]);
 
     app(DefinitionRegistry::class)->register($definition);

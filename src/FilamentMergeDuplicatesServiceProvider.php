@@ -6,7 +6,9 @@ use Filament\Support\Assets\Asset;
 use Filament\Support\Assets\Css;
 use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentIcon;
+use Nagi\FilamentMergeDuplicates\Authorization\MergeAuthorization;
 use Nagi\FilamentMergeDuplicates\Commands\PruneDuplicatesCommand;
+use Nagi\FilamentMergeDuplicates\Commands\RecoverStalledScansCommand;
 use Nagi\FilamentMergeDuplicates\Commands\ScanDuplicatesCommand;
 use Nagi\FilamentMergeDuplicates\Data\KeyHasher;
 use Nagi\FilamentMergeDuplicates\Data\ScopeHasher;
@@ -36,6 +38,7 @@ use Nagi\FilamentMergeDuplicates\Scanning\ReviewGroupQuery;
 use Nagi\FilamentMergeDuplicates\Scanning\ReviewSummaryQuery;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanChunkProcessor;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanCoordinator;
+use Nagi\FilamentMergeDuplicates\Scanning\ScanMaintenance;
 use Nagi\FilamentMergeDuplicates\Scanning\ScanStarter;
 use Nagi\FilamentMergeDuplicates\Scanning\ScopeManager;
 use Nagi\FilamentMergeDuplicates\Scanning\SuggestionQuery;
@@ -113,6 +116,14 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         );
 
         $this->app->singleton(ScanCoordinator::class);
+        $this->app->singleton(
+            ScanMaintenance::class,
+            fn (): ScanMaintenance => new ScanMaintenance(
+                $this->app->make(ScanCoordinator::class),
+                (int) config('merge-duplicates.scan.heartbeat_timeout_minutes', 15),
+                (int) config('merge-duplicates.retention.scans_days', 30),
+            ),
+        );
         $this->app->singleton(DismissalService::class);
         $this->app->singleton(DirectPairMatcher::class);
         $this->app->singleton(SuggestionQuery::class);
@@ -141,6 +152,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
         );
 
         $this->app->singleton(MergePlanner::class);
+        $this->app->singleton(MergeAuthorization::class);
         $this->app->singleton(MergePreviewService::class);
 
         $this->app->singleton(LockManager::class);
@@ -159,6 +171,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
             $app->make(AuditWriter::class),
             $app->make(RetirementResolver::class),
             $app->make(DirectPairMatcher::class),
+            $app->make(MergeAuthorization::class),
             $app->make(RetryPolicy::class),
             array_values(array_filter((array) config('merge-duplicates.supported_merge_drivers', ['mysql', 'pgsql']), 'is_string')),
             (string) config('merge-duplicates.key_version', 'v1'),
@@ -217,6 +230,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
     {
         return [
             PruneDuplicatesCommand::class,
+            RecoverStalledScansCommand::class,
             ScanDuplicatesCommand::class,
         ];
     }
@@ -250,6 +264,7 @@ class FilamentMergeDuplicatesServiceProvider extends PackageServiceProvider
             '2026_10_02_000005_create_filament_merge_duplicates_previews_table',
             '2026_10_02_000006_create_filament_merge_duplicates_merges_table',
             '2026_10_22_000007_stabilize_filament_merge_duplicates_retirement_domains',
+            '2026_10_23_000008_add_filament_merge_duplicates_scan_maintenance_indexes',
         ];
     }
 }

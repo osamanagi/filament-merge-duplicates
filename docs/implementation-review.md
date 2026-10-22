@@ -49,27 +49,30 @@ current Filament 4 lane in an isolated installation. Dependency lower bounds and
 manual browser journeys have not been independently rerun; current results are
 recorded in [testing.md](testing.md).
 
-### P2 — Scope and policy guarantees depend on host integration
+### P2 — Record-specific policies were absent (resolved)
 
-`MergeAuthorizer` answers a context-level ability; it does not accept the actual
-pair or children. Eloquent `save()` does not automatically authorize record-specific
-update/delete policies. Hosts must explicitly make their definition's scope and
-merge ability appropriate for every affected record. If independent per-record
-mutation permissions are a supported requirement, extend the authorization
-contract and test mixed-permission pairs and children. A visible record is not
-automatically an editable record.
+The operation-only authorizer could not evaluate the actual pair or children.
+The follow-up introduces `RecordMergeAuthorizer` and a Laravel Gate adapter.
+Preview checks each parent and transferable child; execution repeats the checks
+on locked rows before writes, checks every actual child transfer, and checks the
+parents again before source retirement. Mixed permissions fail the entire merge.
+Read-only replay requires current scoped parent visibility and view permission.
+Operation-only definitions remain available for detection, with merging blocked.
+See [record authorization](record-authorization.md) and
+[ADR 0011](adr/0011-record-authorization.md).
 
-The WriterGuard contract also remains essential. Unknown host writers and external
+The WriterGuard contract remains essential. Unknown host writers and external
 observer side effects cannot be made transactional by the package.
 
-### P2 — Scan housekeeping and recovery remain incomplete
+### P2 — Scan recovery and derived-data retention (resolved)
 
-Expired previews are pruned, but finished scans, memberships, and dismissals
-accumulate. Heartbeats and cursors exist, but there is no automatic recovery of a
-scan abandoned after worker/process or queue-dispatch failure. A queued/running
-row can block subsequent scans until cancelled. These are operational gaps, not
-reasons to replace the detection algorithm. Unused retention options were removed
-so configuration does not imply an implemented feature.
+Stale queued or running scans now fail with the sanitized `scan_abandoned` code,
+which frees the scope for a new explicitly authorized scan. The package does not
+resume a cursor under guessed actor, tenant or panel context. Schedule
+`recover-scans` at least as often as the heartbeat timeout. The daily prune command
+removes expired previews and old terminal unpublished generations with their
+memberships, but preserves the current generation, dismissals and merge history.
+See [scan maintenance](api-reference.md#commands).
 
 ## Correctness fixes made
 
@@ -119,6 +122,11 @@ only when it removes duplicated behavior or isolates a meaningful responsibility
 splitting every private method into a new class would add indirection without
 improving this plugin.
 
+The agreed sequence is to finish the correctness and operational gaps first:
+record policies, scan recovery/retention, then measured query improvements.
+Keep the larger executor/validator refactor until those behaviors have regression
+coverage, so its effect can be assessed independently of behavior changes.
+
 ## Laravel conventions and cleanup
 
 The existing `Contracts`, `Models`, `Jobs`, `Commands`, `Events`, `Exceptions`,
@@ -128,9 +136,9 @@ folder would not be an improvement. Renaming every `*Record` model or moving
 `Data` to `DTOs` would create public API churn without fixing behavior.
 
 Changes here remove the empty Livewire testing mixin and its boot registration,
-the commented factory and unused factory namespace/resolver, the empty JavaScript
-entry point/build, and unused retention settings. The debug prohibition test now
-lives at `tests/Architecture/ArchitectureTest.php`.
+the commented factory and unused factory namespace/resolver, and the empty
+JavaScript entry point/build. Scan retention is now implemented and documented.
+The debug prohibition test now lives at `tests/Architecture/ArchitectureTest.php`.
 
 Filament page route identities and merge operation tokens use Livewire's `Locked`
 attribute. Services still validate merge inputs; locked properties supplement those

@@ -2,8 +2,9 @@
 
 namespace Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support;
 
+use Illuminate\Database\Eloquent\Model;
 use Nagi\FilamentMergeDuplicates\Authorization\Ability;
-use Nagi\FilamentMergeDuplicates\Contracts\MergeAuthorizer;
+use Nagi\FilamentMergeDuplicates\Contracts\RecordMergeAuthorizer;
 use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
 
 /**
@@ -17,7 +18,7 @@ use Nagi\FilamentMergeDuplicates\Data\DuplicateContext;
  * checks to reach the executor's re-check. Every other ability is granted, so a
  * test isolates the merge permission.
  */
-final class RevokedAfterChecks implements MergeAuthorizer
+final class RevokedAfterChecks implements RecordMergeAuthorizer
 {
     private int $mergeChecks = 0;
 
@@ -30,5 +31,20 @@ final class RevokedAfterChecks implements MergeAuthorizer
         }
 
         return ++$this->mergeChecks <= $this->allowedChecks;
+    }
+
+    public function allowsView(DuplicateContext $context, Model $record): bool
+    {
+        return true;
+    }
+
+    public function allowsPair(DuplicateContext $context, Model $survivor, Model $source): bool
+    {
+        return true;
+    }
+
+    public function allowsChildTransfer(DuplicateContext $context, Model $child, Model $survivor, Model $source, string $relation): bool
+    {
+        return true;
     }
 }

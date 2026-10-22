@@ -6,6 +6,7 @@ use Nagi\FilamentMergeDuplicates\Filament\Pages\DuplicateMergePage;
 use Nagi\FilamentMergeDuplicates\FilamentMergeDuplicatesPlugin;
 use Nagi\FilamentMergeDuplicates\Models\MergeRecord;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Models\Note;
+use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\PolicyPermissions;
 use Nagi\FilamentMergeDuplicates\Tests\Fixtures\Support\RevokedAfterChecks;
 
 use function Pest\Livewire\livewire;
@@ -68,6 +69,30 @@ it('confirms a merge through the page and commits it', function (string $engine)
         ->and($source->trashed())->toBeTrue()
         ->and(Note::query()->where('contact_id', $survivor->getKey())->count())->toBe(1)
         ->and(MergeRecord::on($engine)->count())->toBe(1);
+})->with('engines');
+
+it('refuses forged confirmation state after a child policy is revoked', function (string $engine) {
+    $this->bootEngine($engine);
+    $permissions = new PolicyPermissions;
+    $definition = $this->makeDefinition(['authorizer' => $permissions->authorizer()]);
+    app(DefinitionRegistry::class)->register($definition);
+    executionMergePagePanel();
+    $this->contextFor($definition);
+    $survivor = $this->makeContact(['reference' => 'SAME']);
+    $source = $this->makeContact(['reference' => 'SAME']);
+    $child = $this->addNote($source, 'child');
+    $page = livewire(DuplicateMergePage::class, [
+        'definition' => 'fixture-contacts',
+        'first' => (string) $survivor->getKey(),
+        'second' => (string) $source->getKey(),
+    ])->assertOk();
+    $permissions->deny('transfer', $child);
+
+    $page->set('fatalBlockers', [])->set('choiceFields', [])->call('confirm')->assertForbidden();
+
+    expect($child->fresh()->contact_id)->toBe($source->getKey())
+        ->and($source->fresh()->trashed())->toBeFalse()
+        ->and(MergeRecord::on($engine)->count())->toBe(0);
 })->with('engines');
 
 it('refuses to merge when the pair changed after the preview', function (string $engine) {

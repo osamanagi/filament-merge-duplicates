@@ -67,6 +67,7 @@ Recorded as ADRs:
 - [0010 — Stable retirement domains and legacy conversion](adr/0010-stable-retirement-domains.md)
 - [0004 — Concurrency, lock ordering and the WriterGuard protocol](adr/0004-concurrency-and-writer-guard.md)
 - [0005 — Audit content, encryption and retention](adr/0005-audit-and-encryption.md)
+- [0012 — Scan maintenance](adr/0012-scan-maintenance.md)
 - [0006 — Record ID and field value codecs](adr/0006-id-and-field-codecs.md)
 - [0007 — Persistence schema](adr/0007-persistence-schema.md)
 - [0008 — PHP baseline, Filament 5 and the test-tooling boundary](adr/0008-php-baseline-and-tooling.md)

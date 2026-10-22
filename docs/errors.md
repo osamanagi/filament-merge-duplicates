@@ -21,6 +21,7 @@ and expose `errorCode()`.
 | `unsupported_relation` | `UnsupportedRelation` | A declared relation type cannot be transferred in v1 (anything other than an ordinary `HasMany`), or a relation does not cover the whole foreign key. | Replace it with a supported declaration, or handle the reference outside the package. Blocked instead of guessed. |
 | `retry_exhausted` | `RetryExhausted` | A write was retried past the policy because of sustained contention. | Retry the merge. Nothing was committed. |
 | `scan_failed` | — | Fallback for a scan failure that was not a package exception. | Inspect the application log: the row stores only this code, by design. |
+| `scan_abandoned` | — | A queued job never began, or a running worker stopped updating its heartbeat before `scan.heartbeat_timeout_minutes`. | Fix the worker if needed, then start a new authorized scan. The cursor is not resumed under a guessed actor. |
 
 ## Where a code shows up
 

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Nagi\FilamentMergeDuplicates\Contracts\DuplicateDefinition as DuplicateDefinitionContract;
+use Nagi\FilamentMergeDuplicates\Contracts\RecordMergeAuthorizer;
 use Nagi\FilamentMergeDuplicates\Data\ConfigurationIssue;
 use Nagi\FilamentMergeDuplicates\Data\ConfigurationReport;
 use Nagi\FilamentMergeDuplicates\Data\RecordId;
@@ -482,6 +483,10 @@ final class DefinitionValidator
      */
     private function checkMergeCapability(DuplicateDefinitionContract $definition, Model $model, array &$issues): void
     {
+        if (! $definition->authorizer() instanceof RecordMergeAuthorizer) {
+            $issues[] = ConfigurationIssue::blocker('invalid_configuration', 'Merge requires a RecordMergeAuthorizer for parent view, survivor/source mutation, and child-transfer permissions. Operation-only authorization still supports detection.', 'authorizer');
+        }
+
         if (! in_array(SoftDeletes::class, class_uses_recursive($model), true)) {
             $issues[] = ConfigurationIssue::blocker(
                 'invalid_configuration',

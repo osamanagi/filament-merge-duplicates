@@ -56,7 +56,7 @@ function allowingAuthorizer(): AbilityMapAuthorizer
         Ability::Dismiss,
         Ability::Scan,
         Ability::Merge,
-    ], 'actor-1');
+    ], 'actor-1', allowAllRecords: true);
 }
 
 /**
@@ -78,6 +78,20 @@ function mergeReadyDefinition(array $overrides = []): ConfigurableDefinition
         ...$overrides,
     ]);
 }
+
+it('does not let a direct planner call preview an out-of-scope or wrong-model parent', function () {
+    $definition = mergeReadyDefinition();
+    $context = plannerContext();
+    $first = plannerContact(['reference' => 'SAME']);
+    $outside = plannerContact(['tenant_id' => 'tenant-b', 'reference' => 'SAME']);
+
+    expect(fn () => app(MergePlanner::class)->plan($context, $definition, $first, $outside))
+        ->toThrow(RecordUnavailable::class);
+    $wrong = new InventoryItem(['id' => '01900000-0000-7000-8000-000000000001']);
+    expect(fn () => app(MergePlanner::class)->plan($context, $definition, $first, $wrong))
+        ->toThrow(RecordUnavailable::class);
+    expect(PreviewRecord::count())->toBe(0);
+});
 
 function plannerContext(): DuplicateContext
 {
